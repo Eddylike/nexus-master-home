@@ -23,6 +23,7 @@ from nexus.common.paths import STATIC_DIR, MEDIA_DIR, DOWNLOADS_DIR, SCREENS_DIR
 
 HOST = Config.HOST
 PORT = Config.PORT
+_CORS_ORIGINS = frozenset(o.strip() for o in os.environ.get("NEXUS_CORS_ORIGINS", "").split(",") if o.strip())
 ENGINE = NexusEngine()
 SHARED_ROOM = SharedRoom()
 
@@ -192,9 +193,31 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
     def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        # Kein "*" mehr: Das UI läuft same-origin und braucht kein CORS. Fremde Origins nur per
+        # expliziter Allowlist (NEXUS_CORS_ORIGINS="http://a:8299,http://b:8299").
+        origin = self.headers.get("Origin") if getattr(self, "headers", None) else None
+        if origin and origin in _CORS_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+    def _cross_site_blocked(self) -> bool:
+        """CSRF-Schutz für POST: Browser-Requests von fremden Seiten ablehnen.
+
+        Native Clients (Handy-App, curl, Agenten) senden weder Origin noch Sec-Fetch-Site
+        und bleiben unberührt. Der Loopback-Check allein schützt nicht, weil ein Browser
+        auf demselben Rechner ebenfalls von 127.0.0.1 kommt.
+        """
+        h = self.headers
+        if h.get("Sec-Fetch-Site", "") == "cross-site":
+            return True
+        origin = h.get("Origin")
+        if not origin or origin in _CORS_ORIGINS:
+            return False
+        if origin == "null":
+            return True
+        return urlparse(origin).netloc.lower() != (h.get("Host") or "").lower()
 
     def _serve_evidence(self, rel: str) -> None:
         """Nur PNG-Screenshots der Browserprüfungen (Beleg), keine anderen Dateien."""
@@ -694,6 +717,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        if self._cross_site_blocked():
+            try:
+                from nexus.terminal.guard import audit
+                audit("cross_site_post_denied", path=path[:200], origin=str(self.headers.get("Origin"))[:200])
+            except Exception:
+                pass
+            return self._json(403, {"success": False, "error": "CROSS_SITE_DENIED"})
         try:  # NEXUS OS live link evidence (memory only): last request per client IP
             from nexus import nexus_os as _nos
             _nos.note_client(self.client_address[0], path)
@@ -732,8 +762,16 @@ class Handler(BaseHTTPRequestHandler):
                     _code = {"BLOCKED": 403, "LEVEL_DENIED": 403, "APPROVAL_REQUIRED": 202}.get(str(_r.get("status")), 200)
                     return self._json(_code, _r)
                 if path == "/api/terminal/zocker":
+                    # Zocker-Modus: NEXUS abschalten. Skript per Env konfigurierbar; Default liegt neben
+                    # dem Repo (auf WoZiPC: G:\meine-ki\zocker_bombe.ps1).
                     import subprocess as _sp
-                    _sp.Popen(["powershell","-NoProfile","-ExecutionPolicy","Bypass","-File",r"G:\meine-ki\zocker_bombe.ps1"],creationflags=0x08000000)
+                    if os.name != "nt":
+                        return self._json(501, {"success": False, "error": "WINDOWS_ONLY"})
+                    _zs = Path(os.environ.get("NEXUS_ZOCKER_SCRIPT") or (Path(__file__).resolve().parents[3] / "zocker_bombe.ps1"))
+                    if not _zs.is_file():
+                        return self._json(404, {"success": False, "error": "ZOCKER_SCRIPT_MISSING"})
+                    _sp.Popen(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(_zs)],
+                              creationflags=0x08000000)
                     return self._json(200, {"success": True})
                 if path == "/api/terminal/cancel":
                     return self._json(200, _term.cancel(str(b.get("run") or ""), by=str(b.get("by") or "Eddie-UI")))

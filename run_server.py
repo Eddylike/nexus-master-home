@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""NEXUS AI Master entrypoint — Port 8299, Host 0.0.0.0."""
+"""NEXUS AI Master entrypoint — Port 8299, Host aus NEXUS_HOST (Default 127.0.0.1)."""
 from __future__ import annotations
 # 20261031: Konsole kann fehlen (WinError 50) -> Ausgaben nie den Server/Stream crashen lassen
 import sys as _sys, io as _io, os as _os

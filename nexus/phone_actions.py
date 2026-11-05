@@ -3,7 +3,7 @@
 Sicherheitsregel (Eddie / Stabschef):
 - KEINE generische Remote-Shell. Nur feste, erlaubte Aktionen mit validierten Parametern.
 - adb wird immer mit Argument-Liste (shell=False) und festem Serial aufgerufen.
-- Primaer drahtlos (Tailscale) 192.0.2.10:5555, Fallback USB 249ac5d7 (konfigurierbar).
+- Primaer drahtlos (Tailscale, NEXUS_PHONE_TAILSCALE_IP) 192.0.2.10:5555, Fallback USB 249ac5d7 (konfigurierbar).
 - Erlaubt: `adb connect <tcp-endpoint>` (idempotent). VERBOTEN: tcpip, kill-server,
   forward --remove(-all), pair, disconnect. Der Forward tcp:18766 -> 8766 bleibt unangetastet.
 - Keine Nachrichtentexte, Nummern oder Tokens im Log (nur Laenge + Empfaenger-Maske).
@@ -29,11 +29,14 @@ CONFIG_PATH = ROOT / "workspace" / "voice" / "phone_actions.json"
 CONTACTS_PATH = ROOT / "workspace" / "apex" / "contacts.json"
 LOG_PATH = ROOT / "logs" / "voice_commands.jsonl"
 
+# Tailscale-IP des Handys; per Env ueberschreibbar, falls Tailscale neu vergibt.
+PHONE_TAILSCALE_IP = os.environ.get("NEXUS_PHONE_TAILSCALE_IP", "192.0.2.10")
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "adb_path": r"C:\Users\gustl\AppData\Local\Android\Sdk\platform-tools\adb.exe",
     # Reihenfolge = Prioritaet. Erster Eintrag mit ':' ist der TCP-Endpunkt fuer `adb connect`.
-    "serials": ["192.0.2.10:5555", "249ac5d7"],
-    "tcp_endpoint": "192.0.2.10:5555",
+    "serials": [f"{PHONE_TAILSCALE_IP}:5555", "249ac5d7"],
+    "tcp_endpoint": f"{PHONE_TAILSCALE_IP}:5555",
     "default_country_code": "49",
     "read_phone_contacts": True,
     "send_button_wait_s": 10,
@@ -222,7 +225,7 @@ def select_device(connect: bool = True) -> dict[str, Any]:
 IDENTITY_PATH = ROOT / "workspace" / "phone_data" / "phone_identity.json"
 RECONNECT_LOG = ROOT / "workspace" / "phone_data" / "adb_reconnect.log"
 FALLBACK_DEVICE = "sapphiren"
-TAILSCALE_IP = "192.0.2.10"
+TAILSCALE_IP = PHONE_TAILSCALE_IP
 _RE_PROP = re.compile(r"^[A-Za-z0-9._ -]{1,64}$")
 _RE_HOSTPORT = re.compile(r"^(\d{1,3}(?:\.\d{1,3}){3}):(\d{2,5})$")
 _WD: dict[str, Any] = {"last_seen": None, "reconnect_attempts": 0, "last_error": None, "last_attempt": None,

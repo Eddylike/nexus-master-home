@@ -1,6 +1,6 @@
 """NEXUS OS <-> NEXUS Master Home link (Auftrag 005D).
 
-Endpoints (only from loopback, Tailscale 192.0.2.11/10 or home LAN 192.0.2.12/16;
+Endpoints (only from loopback, Tailscale 100.64.0.0/10 or home LAN 192.168.0.0/16;
 proxied/Funnel requests are refused):
   POST /api/nexus-os/device      phone heartbeat {battery, charging, net, app_version, version_code, ...}
   GET  /api/nexus-os/device      last heartbeat + age (missing values stay null, nothing invented)
@@ -26,7 +26,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DIR = ROOT / "workspace" / "nexus_os_link"
 _LOCK = threading.Lock()
-_NETS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "192.0.2.11/10", "192.0.2.12/16", "::1/128", "fd7a:115c:a1e0::/48")]
+_NETS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "100.64.0.0/10", "192.168.0.0/16", "::1/128", "fd7a:115c:a1e0::/48")]
 _PROXY_HDRS = ("X-Forwarded-For", "Tailscale-User-Login", "X-Forwarded-Host", "Forwarded")
 KINDS = ("chat", "voice", "ai", "event", "pc_command", "ctx")
 # F-05: gemeinsamer Gespraechskontext (kind "ctx"), Last-Writer-Wins pro id nach ts, nie Secrets

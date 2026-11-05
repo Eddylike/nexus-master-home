@@ -31,7 +31,7 @@ _LOCK = threading.RLock()
 _CODE = re.compile(r"[0-9]{12}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _NETS = tuple(ipaddress.ip_network(net) for net in (
-    "127.0.0.0/8", "::1/128", "192.0.2.11/10", "fd7a:115c:a1e0::/48"))
+    "127.0.0.0/8", "::1/128", "100.64.0.0/10", "fd7a:115c:a1e0::/48"))
 
 
 class PairingError(Exception):

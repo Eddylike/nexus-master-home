@@ -161,7 +161,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "fallback_order": [PROVIDER_PHONE_LOCAL, PROVIDER_WOZIPC_LOCAL, PROVIDER_CHATGPT_OPTIONAL],
     "phone_enabled": True,
     "phone_adb_serial": "249ac5d7",
-    "phone_tailscale_ip": "192.0.2.10",
+    "phone_tailscale_ip": os.environ.get("NEXUS_PHONE_TAILSCALE_IP", "192.0.2.10"),
     "phone_tailscale_host": "redmi-note-13",
     "phone_peer_match": "ip",              # ip (default) | host  - no name guessing when an IP is configured
     "phone_expected_model": "23124RA7EO",  # Redmi Note 13 (sapphiren), from adb devices -l of serial 249ac5d7

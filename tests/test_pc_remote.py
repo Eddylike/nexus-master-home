@@ -654,7 +654,7 @@ class SyncTransport(IsolatedState):
         self.service.publisher = link.publish_pc_event
         self.headers = {"Authorization": "Bearer " + TEST_TOKEN}
 
-    def request(self, method="POST", *, headers=None, body=None, qs=None, ip="192.0.2.10"):
+    def request(self, method="POST", *, headers=None, body=None, qs=None, ip="100.64.0.10"):
         return link.handle(method, "/api/nexus-os/sync", ip,
                            self.headers if headers is None else headers, body=body, qs=qs)
 
@@ -683,8 +683,8 @@ class SyncTransport(IsolatedState):
         with mock.patch.object(remote, "_token", return_value=""):
             code, response = self.request(body={"items": [self.item()]})
             self.assertEqual((code, response["error"]), (401, "PC_AUTH_UNCONFIGURED"))
-        for ip, headers in (("8.8.8.8", self.headers), ("192.0.2.10", {
-                **self.headers, "X-Forwarded-For": "192.0.2.10"})):
+        for ip, headers in (("8.8.8.8", self.headers), ("100.64.0.10", {
+                **self.headers, "X-Forwarded-For": "100.64.0.10"})):
             code, response = self.request(ip=ip, headers=headers, body={"items": [self.item()]})
             self.assertEqual((code, response["error"]), (403, "NETWORK_NOT_ALLOWED"))
         self.executor.assert_not_called()
@@ -795,7 +795,7 @@ class SyncTransport(IsolatedState):
         self.executor.assert_not_called()
 
     def test_push_cannot_execute_commands_or_be_written_from_phone(self):
-        code, result = link.handle("POST", "/api/nexus-os/push", "192.0.2.10",
+        code, result = link.handle("POST", "/api/nexus-os/push", "100.64.0.10",
                                    self.headers, body={"kind": "event", "text": "fake done"})
         self.assertEqual((code, result["error"]), (403, "LOCAL_ONLY"))
         code, result = link.push({"kind": "pc_command", "text": "open"})
@@ -805,16 +805,16 @@ class SyncTransport(IsolatedState):
     def test_existing_voice_confirm_adapter_is_authenticated_and_queued(self):
         original = self.ask()
         body = {"id": original["confirm_id"], "answer": "Ja", "source": "voice", "request_id": "adapter-confirm"}
-        code, result = remote.voice_confirm(body, "192.0.2.10", {})
+        code, result = remote.voice_confirm(body, "100.64.0.10", {})
         self.assertEqual((code, result["error"]), (401, "PC_AUTH_REQUIRED"))
-        code, result = remote.voice_confirm(body, "192.0.2.10", self.headers)
+        code, result = remote.voice_confirm(body, "100.64.0.10", self.headers)
         self.assertEqual(code, 202)
         self.assertEqual(result["receipt"]["status"], "queued")
         self.executor.assert_not_called()
         self.service.process_pending()
         self.assertEqual(original["status"], "done")
         self.executor.assert_called_once()
-        code, duplicate = remote.voice_confirm(body, "192.0.2.10", self.headers)
+        code, duplicate = remote.voice_confirm(body, "100.64.0.10", self.headers)
         self.assertEqual(code, 202)
         self.assertTrue(duplicate["receipt"]["duplicate"])
         self.service.process_pending()

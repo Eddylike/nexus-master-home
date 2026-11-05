@@ -27,8 +27,8 @@ def g_tmp(monkeypatch):
 
 
 def test_network_filter():
-    assert L.allowed("192.0.2.10", {})
-    assert L.allowed("192.0.2.10", {})
+    assert L.allowed("100.64.0.10", {})
+    assert L.allowed("100.64.0.10", {})
     assert L.allowed("127.0.0.1", {})
     assert not L.allowed("8.8.8.8", {})
     assert not L.allowed("127.0.0.1", {"X-Forwarded-For": "1.2.3.4"})
@@ -41,7 +41,7 @@ def test_device_roundtrip(g_tmp):
     c, r = L.handle(
         "POST",
         "/api/nexus-os/device",
-        "192.0.2.10",
+        "100.64.0.10",
         {},
         body={"battery": "77", "net": "wifi", "bogus": 1},
     )
@@ -52,11 +52,11 @@ def test_device_roundtrip(g_tmp):
 
 def test_sync_idempotent_and_push(g_tmp):
     items = [{"id": "a1", "kind": "chat", "text": "hi"}, {"id": "x", "kind": "bad"}]
-    r1 = L.handle("POST", "/api/nexus-os/sync", "192.0.2.10", {}, body={"items": items})[1]
-    r2 = L.handle("POST", "/api/nexus-os/sync", "192.0.2.10", {}, body={"items": items})[1]
+    r1 = L.handle("POST", "/api/nexus-os/sync", "100.64.0.10", {}, body={"items": items})[1]
+    r2 = L.handle("POST", "/api/nexus-os/sync", "100.64.0.10", {}, body={"items": items})[1]
     assert r1["acked"] == ["a1"] == r2["acked"] and r1["rejected"] == ["x"]
     assert len((g_tmp / "inbox.jsonl").read_text(encoding="utf-8").splitlines()) == 1
-    assert L.handle("POST", "/api/nexus-os/push", "192.0.2.10", {}, body={"text": "x"})[0] == 403
+    assert L.handle("POST", "/api/nexus-os/push", "100.64.0.10", {}, body={"text": "x"})[0] == 403
     L.handle("POST", "/api/nexus-os/push", "127.0.0.1", {}, body={"text": "vom PC"})
     g = L.sync_get({"since": ["0"]})[1]
     assert g["cursor"] == 1 and g["items"][0]["text"] == "vom PC"

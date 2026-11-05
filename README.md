@@ -55,7 +55,9 @@ python -m pytest -q
 
 ## Sicherheitshinweise
 
-- Standardmäßig lauscht der Server nur auf `127.0.0.1`. Gib ihn nicht ungeschützt ins Internet frei.
+- `python run_server.py` lauscht standardmäßig nur auf `127.0.0.1`. Die Startskripte (`start_nexus.ps1`, `start_nexus.sh`) setzen bewusst `NEXUS_HOST=0.0.0.0`, damit das Handy (`/m`) im LAN/Tailscale zugreifen kann. Gib den Server nicht ungeschützt ins Internet frei.
+- POST-Requests von fremden Webseiten werden abgelehnt (CSRF-Schutz über `Origin`/`Sec-Fetch-Site`). Weitere Browser-Origins nur explizit über `NEXUS_CORS_ORIGINS` (kommagetrennt) freigeben.
+- Zocker-Modus: Skriptpfad über `NEXUS_ZOCKER_SCRIPT`, Standard ist `zocker_bombe.ps1` im Ordner über dem Repo.
 - Geheimnisse wie Tokens, App-Passwörter und Geräteadressen gehören ausschließlich in `.env`. Diese Datei wird nicht committet.
 - IP-Adressen im Code sind Platzhalter aus dem Dokumentationsbereich (`192.0.2.x`). Trage deine eigenen Geräte über `.env` bzw. die Konfiguration ein.
 - Chatverläufe, Gedächtnisdaten, Logs und Uploads (`workspace/`) sind nicht Teil des Repos und bleiben lokal.

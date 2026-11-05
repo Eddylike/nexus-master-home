@@ -4,7 +4,8 @@ import os
 
 
 class Config:
-    HOST = os.environ.get("NEXUS_HOST", "0.0.0.0")
+    # Default nur lokal; LAN/Handy (/m) bewusst per NEXUS_HOST=0.0.0.0 (setzen start_nexus.ps1/.sh)
+    HOST = os.environ.get("NEXUS_HOST", "127.0.0.1")
     PORT = int(os.environ.get("NEXUS_PORT", "8299"))
     SSL_PORT = int(os.environ.get("NEXUS_SSL_PORT", "8443"))
     # Relative to project root; resolved in server via paths.WORKSPACE

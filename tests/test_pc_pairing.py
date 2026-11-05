@@ -46,7 +46,7 @@ class PCPairingTests(unittest.TestCase):
     def start(self, replace=False):
         return pc_pairing.start_pairing(replace=replace)
 
-    def exchange(self, code=None, ip="192.0.2.11", headers=None):
+    def exchange(self, code=None, ip="100.101.102.103", headers=None):
         return pc_pairing.exchange({"code": self.CODE if code is None else code}, ip, headers or {})
 
     def restart(self):
@@ -61,7 +61,7 @@ class PCPairingTests(unittest.TestCase):
     def test_success_once_and_restart_cannot_reissue(self):
         self.assertEqual(self.start()["code"], self.CODE)
         restarted = self.restart()
-        status, response = restarted.exchange({"code": self.CODE}, "192.0.2.11", {})
+        status, response = restarted.exchange({"code": self.CODE}, "100.101.102.103", {})
         self.assertEqual(status, 200)
         self.assertEqual(response, {"success": True, "token": self.TOKEN, "token_type": "Bearer"})
         self.assertEqual(self.paths["TOKEN_PATH"].read_text().strip(), self.TOKEN)
@@ -97,7 +97,7 @@ class PCPairingTests(unittest.TestCase):
 
     def test_network_and_proxy_rejections_do_not_consume_attempts(self):
         self.start()
-        for ip in ("192.0.2.12", "192.0.2.13", "8.8.8.8", "100.63.255.255", "fd00::1", "invalid"):
+        for ip in ("192.168.178.20", "10.0.0.5", "8.8.8.8", "100.63.255.255", "fd00::1", "invalid"):
             self.assertEqual(self.exchange(ip=ip)[0], 403)
         for header in ("X-Forwarded-For", "x-forwarded-host", "Forwarded", "Tailscale-User-Login",
                        "X-Forwarded-Proto", "Via", "X-Real-IP", "X-Tailscale-Funnel-Request"):
@@ -123,11 +123,11 @@ class PCPairingTests(unittest.TestCase):
                                              body={"start": True})[0], 400)
         self.assertFalse(self.paths["STATE_PATH"].exists())
         self.start()
-        self.assertEqual(nexus_os_link.handle("POST", path, "192.0.2.12", {},
+        self.assertEqual(nexus_os_link.handle("POST", path, "192.168.178.20", {},
                                              body={"code": self.CODE})[0], 403)
-        self.assertEqual(nexus_os_link.handle("POST", path, "192.0.2.11", {"x-forwarded-host": "proxy"},
+        self.assertEqual(nexus_os_link.handle("POST", path, "100.101.102.103", {"x-forwarded-host": "proxy"},
                                              body={"code": self.CODE})[0], 403)
-        status, response = nexus_os_link.handle("POST", path, "192.0.2.11", {}, body={"code": self.CODE})
+        status, response = nexus_os_link.handle("POST", path, "100.101.102.103", {}, body={"code": self.CODE})
         self.assertEqual(status, 200)
         self.assertEqual(response["token_type"], "Bearer")
         self.assertEqual(response["token"], self.TOKEN)
@@ -138,7 +138,7 @@ class PCPairingTests(unittest.TestCase):
                                            "evidence": {"verified": True, "synthetic": True}})
         service = pc_remote.PCRemoteService(self.directory_path / "commands", executor=executor,
                                            publisher=nexus_os_link.publish_pc_event, start_worker=False)
-        ip, path = "192.0.2.11", "/api/nexus-os/sync"
+        ip, path = "100.101.102.103", "/api/nexus-os/sync"
         with mock.patch.object(nexus_os_link, "DIR", self.directory_path / "link"), \
                 mock.patch.object(pc_remote, "TOKEN_PATH", self.paths["TOKEN_PATH"]), \
                 mock.patch.object(pc_remote, "_SERVICE", service):
