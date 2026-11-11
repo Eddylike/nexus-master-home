@@ -2181,7 +2181,7 @@
   }
 
   function closeAllWorkspacePanels() {
-    ["musicPanel","streamsPanel","videosPanel","galleryPanel","mapsPanel","appsPanel","crewPanel","perfPanel","filesPanel","projectsPanel","downloadsPanel","settingsPanel","activityPanel","homePanel","memoryPanel","skillsPanel","voicePanel"].forEach((id) => {
+    ["musicPanel","streamsPanel","videosPanel","galleryPanel","mapsPanel","appsPanel","crewPanel","perfPanel","filesPanel","projectsPanel","downloadsPanel","libraryPanel","settingsPanel","activityPanel","homePanel","memoryPanel","skillsPanel","voicePanel"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove("show");
     });
@@ -2326,8 +2326,6 @@
     }
     const auto = $("#settingsAutoSpeak");
     if (auto) auto.checked = !!(voice && voice.autoSpeak);
-    const desk = $("#settingsDesktopBg");
-    if (desk) desk.checked = document.body.classList.contains("nx-desktop-bg");
     const right = $("#settingsRightPanel");
     if (right) right.checked = !$("#nxApp").classList.contains("right-collapsed");
     if (health) {
@@ -2925,6 +2923,7 @@
       if (v === "crew") { showWorkspacePanel("crewPanel"); Promise.resolve(refreshCrew()).catch((e)=>addMsg("assistant","Crew-Fehler: "+e)); return; }
       if (v === "memory") { showWorkspacePanel("memoryPanel"); Promise.resolve(refreshMemory()).catch((e)=>addMsg("assistant","Memory-Fehler: "+e)); return; }
       if (v === "skills") { showWorkspacePanel("skillsPanel"); Promise.resolve(refreshSkills()).catch((e)=>addMsg("assistant","Skills-Fehler: "+e)); return; }
+      if (v === "library") { showWorkspacePanel("libraryPanel"); Promise.resolve(window.nxLibraryRefresh && window.nxLibraryRefresh()).catch((e)=>addMsg("assistant","Bibliothek-Fehler: "+e)); return; }
       if (v === "voice") { showWorkspacePanel("voicePanel"); Promise.resolve(refreshVoicePanel()).catch((e)=>addMsg("assistant","Voice-Fehler: "+e)); return; }
       if (v === "perf") { openPerfPanel(); return; }
       if (v === "files") { showWorkspacePanel("filesPanel"); refreshFiles(filesCursor || ""); return; }
@@ -2949,6 +2948,7 @@
     ["btnCloseActivity","activityPanel"],
     ["btnCloseHome","homePanel"],
     ["btnCloseMemory","memoryPanel"],
+    ["btnCloseLibrary","libraryPanel"],
     ["btnCloseSkills","skillsPanel"],
     ["btnCloseVoice","voicePanel"],
   ];
@@ -3009,14 +3009,7 @@ $("#btnFilesExplorer") && ($("#btnFilesExplorer").onclick = async () => {
       }
     } catch (e) { /* offline settings still apply in UI */ }
     if ($("#settingsAutoSpeak")) setAutoSpeak(!!$("#settingsAutoSpeak").checked, false);
-    if ($("#settingsDesktopBg")) {
-      const want = !!$("#settingsDesktopBg").checked;
-      const on = document.body.classList.contains("nx-desktop-bg");
-      if (want !== on) {
-        const b = document.getElementById("btnDesktopBg");
-        if (b) b.click();
-      }
-    }
+    /* MH4D-11 2026-11-10: tote settingsDesktopBg-Reste entfernt (Checkbox seit 02.11. weg, Schalter btnDesktopBg bleibt) */
     if ($("#settingsRightPanel")) {
       const want = !!$("#settingsRightPanel").checked;
       const collapsed = $("#nxApp").classList.contains("right-collapsed");
@@ -3373,6 +3366,7 @@ $("#btnFilesExplorer") && ($("#btnFilesExplorer").onclick = async () => {
       { view: "crew", label: "Agenten", icon: "A" },
       { view: "files", label: "Dateien", icon: "D" },
       { view: "skills", label: "Skills", icon: "S" },
+      { view: "library", label: "Bibliothek", icon: "📚" },
       { view: "memory", label: "Memory", icon: "M" },
       { view: "perf", label: "System", icon: "Y" },
       { view: "voice", label: "Voice", icon: "V" },

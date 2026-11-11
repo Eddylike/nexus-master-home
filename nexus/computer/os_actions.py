@@ -336,6 +336,7 @@ class OSActions:
         for _ in range(2): name = re.sub(r"\s+(?:(?:am|auf\s+(?:dem|meinem)?|im)\s*(?:pc|rechner|computer|laptop|desktop)|bitte|mal)\s*[.!?]*$", "", (name or "").strip(), flags=re.I).strip()
         key = (name or "").strip().lower()
         key = re.sub(r"\s+", " ", key)
+        key = key.strip(" .!?,;:")
         key = re.sub(r"\bwhats\s*[-_]?\s*app\b", "whatsapp", key)
         key = key.replace("whats-app", "whatsapp")
         if not key:

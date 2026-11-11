@@ -1,30 +1,31 @@
 /* 20261102 NEXUS 4D Theme-Layer fuer Master Home (ersetzt White Glass). Rollback: Link in index.html entfernen. */
 :root{
-  --n4-bg0:#05060a;--n4-bg1:#0a0d16;--n4-bg2:#111524;
-  --n4-glass:rgba(13,17,30,.72);--n4-glass-hi:rgba(20,26,44,.82);
-  --n4-stroke:rgba(120,180,255,.12);--n4-stroke-hi:rgba(120,200,255,.35);
-  --n4-txt:#e6ecff;--n4-dim:#9aa6cc;
-  --n4-cyan:#00e5ff;--n4-violet:#8a5cff;--n4-magenta:#ff3ea5;--n4-lime:#a8ff60;--n4-amber:#ffb347;--n4-red:#ff4d5e;
+  --n4-bg0:#b8e4f8;--n4-bg1:#cfe8f6;--n4-bg2:#e8d8f6;
+  --n4-glass:rgba(255,255,255,.45);--n4-glass-hi:rgba(255,255,255,.68);
+  --n4-stroke:rgba(255,255,255,.62);--n4-stroke-hi:rgba(57,255,20,.42);
+  --n4-txt:#12203a;--n4-dim:#3a4d6b;
+  --n4-cyan:#0A6B22;--n4-violet:#5A3D9A;--n4-magenta:#8a6bc0;--n4-lime:#39FF14;--n4-amber:#c67c12;--n4-red:#ff4d5e;
+  --n4-neon:#39FF14;--n4-lilac:#c9b4e8;--n4-green:#0A6B22;
   --n4-r:22px;--n4-r-sm:12px;--n4-gap:12px;
   --n4-font:'Inter','Segoe UI',system-ui,sans-serif;
-  color-scheme:dark;
+  color-scheme:light;
 }
 html{background:var(--n4-bg0)!important}
 body.nx-4d,body.nx-4d.nx-app{
   font-family:var(--n4-font)!important;color:var(--n4-txt)!important;
-  background:radial-gradient(1200px 800px at 15% -10%,#16203a 0%,transparent 60%),radial-gradient(900px 700px at 100% 110%,#25123a 0%,transparent 55%),var(--n4-bg0)!important;
+  background:linear-gradient(165deg,#b8e4f8 0%,#c5e8f6 30%,#d5dcf5 58%,#e0d0f4 82%,#e8d8f6 100%)!important;
   filter:none!important;overflow-x:hidden!important;
 }
 /* alter Video-Hintergrund/Sterne/Dim aus: 4D-Raster ersetzt sie */
 body.nx-4d #nxDesktopBgWrap,body.nx-4d #nxDesktopDim,body.nx-4d #nxStars,body.nx-4d #btnDesktopBg{display:none!important}
-body.nx-4d #settingsDesktopBg{pointer-events:none}
+
 .n4-bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .n4-grid{position:absolute;inset:-48px;background-image:linear-gradient(rgba(120,180,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(120,180,255,.05) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(circle at 50% 40%,#000 30%,transparent 80%);mask-image:radial-gradient(circle at 50% 40%,#000 30%,transparent 80%);animation:n4Drift 40s linear infinite;will-change:transform}
 @keyframes n4Drift{to{transform:translate(48px,48px)}}
 .n4-blob{position:absolute;border-radius:50%;filter:blur(120px);opacity:.30}
-.n4-blob.b1{width:520px;height:520px;background:var(--n4-violet);top:-180px;left:-120px;animation:n4F1 18s ease-in-out infinite}
-.n4-blob.b2{width:480px;height:480px;background:var(--n4-cyan);bottom:-200px;right:-140px;opacity:.22;animation:n4F2 22s ease-in-out infinite}
-.n4-blob.b3{width:360px;height:360px;background:var(--n4-magenta);top:40%;left:55%;opacity:.12;animation:n4F1 26s ease-in-out infinite reverse}
+.n4-blob.b1{width:520px;height:520px;background:#7ec8ea;top:-180px;left:-120px;animation:n4F1 18s ease-in-out infinite}
+.n4-blob.b2{width:480px;height:480px;background:var(--n4-lime);bottom:-200px;right:-140px;opacity:.22;animation:n4F2 22s ease-in-out infinite}
+.n4-blob.b3{width:360px;height:360px;background:var(--n4-lilac);top:40%;left:55%;opacity:.12;animation:n4F1 26s ease-in-out infinite reverse}
 @keyframes n4F1{50%{transform:translate(60px,40px)}}
 @keyframes n4F2{50%{transform:translate(-50px,-30px)}}
 body.nx-4d #nxApp{position:relative;z-index:2;background:transparent!important}
@@ -35,9 +36,9 @@ body.nx-4d .panel,body.nx-4d .float-panel,body.nx-4d dialog,body.nx-4d .nx-ai-ro
 body.nx-4d [class*="card"],body.nx-4d [class*="tile"]:not(.n4-skip),body.nx-4d .side-status,body.nx-4d .side-more,body.nx-4d #nx-shell-panel{
   background:var(--n4-glass)!important;color:var(--n4-txt)!important;border-color:var(--n4-stroke)!important;
   -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);
-  box-shadow:0 10px 40px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.03)!important;
+  box-shadow:0 10px 40px rgba(18,32,58,.10),inset 0 1px 0 rgba(255,255,255,.70)!important;
 }
-body.nx-4d #nxTop{background:linear-gradient(180deg,rgba(15,20,35,.85),rgba(10,13,22,.55))!important;border-bottom:1px solid var(--n4-stroke)!important;box-shadow:none!important}
+body.nx-4d #nxTop{background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.28))!important;border-bottom:1px solid var(--n4-stroke)!important;box-shadow:none!important}
 body.nx-4d #nxSide{border-right:1px solid var(--n4-stroke)!important}
 body.nx-4d #nxRight{border-left:1px solid var(--n4-stroke)!important}
 body.nx-4d #nxChat,body.nx-4d #nxThread,body.nx-4d #messages,body.nx-4d #welcome{background:transparent!important;color:var(--n4-txt)!important}
@@ -66,13 +67,13 @@ body.nx-4d #nxReferenceCard-zocker{--glow:var(--n4-red);background:linear-gradie
 /* Text */
 body.nx-4d h1,body.nx-4d h2,body.nx-4d h3,body.nx-4d h4,body.nx-4d strong,body.nx-4d b,body.nx-4d label,body.nx-4d p,body.nx-4d li,body.nx-4d td,body.nx-4d th,body.nx-4d summary,body.nx-4d span:not(.n4-keep){color:inherit}
 body.nx-4d .muted,body.nx-4d .top-sub,body.nx-4d small,body.nx-4d .streams-note,body.nx-4d .nx-partner-role{color:var(--n4-dim)!important}
-body.nx-4d #chatTitle,body.nx-4d .nx-ai-room-head strong,body.nx-4d #welcome h1,body.nx-4d #welcome h2{background:linear-gradient(90deg,var(--n4-cyan),var(--n4-violet),var(--n4-magenta));-webkit-background-clip:text;background-clip:text;color:transparent!important;font-weight:800;letter-spacing:.06em}
+body.nx-4d #chatTitle,body.nx-4d .nx-ai-room-head strong,body.nx-4d #welcome h1,body.nx-4d #welcome h2{background:linear-gradient(90deg,var(--n4-green),var(--n4-violet));-webkit-background-clip:text;background-clip:text;color:transparent!important;font-weight:800;letter-spacing:.06em}
 body.nx-4d a{color:var(--n4-cyan)}
 /* Logo-Marke vor Titel */
-body.nx-4d #chatTitle::before{content:"";display:inline-block;width:22px;height:22px;margin-right:10px;vertical-align:-5px;border-radius:7px;background:conic-gradient(from 210deg,var(--n4-cyan),var(--n4-violet),var(--n4-magenta),var(--n4-cyan));box-shadow:0 0 18px rgba(120,120,255,.6)}
+body.nx-4d #chatTitle::before{content:"";display:inline-block;width:22px;height:22px;margin-right:10px;vertical-align:-5px;border-radius:7px;background:conic-gradient(from 210deg,var(--n4-neon),var(--n4-lilac),var(--n4-violet),var(--n4-neon));box-shadow:0 0 18px rgba(57,255,20,.45)}
 
 /* Chips mit Puls-Dot */
-body.nx-4d .chip{background:rgba(15,20,35,.75)!important;color:var(--n4-txt)!important;border:1px solid var(--n4-stroke)!important;border-radius:999px!important;display:inline-flex;align-items:center;gap:6px}
+body.nx-4d .chip{background:rgba(255,255,255,.62)!important;color:var(--n4-txt)!important;border:1px solid var(--n4-stroke)!important;border-radius:999px!important;display:inline-flex;align-items:center;gap:6px}
 body.nx-4d .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--n4-dim);flex:none}
 body.nx-4d .chip.ok::before{background:var(--n4-lime);box-shadow:0 0 8px var(--n4-lime);animation:n4Pulse 2s ease-in-out infinite}
 body.nx-4d .chip.warn::before,body.nx-4d .chip.busy::before{background:var(--n4-amber);box-shadow:0 0 8px var(--n4-amber);animation:n4Pulse 1.2s infinite}
@@ -81,26 +82,26 @@ body.nx-4d .chip.err::before,body.nx-4d .chip.bad::before,body.nx-4d .chip.down:
 
 /* Controls */
 body.nx-4d button,body.nx-4d .icon-btn,body.nx-4d select,body.nx-4d input,body.nx-4d textarea{font-family:var(--n4-font)}
-body.nx-4d button:not([id^="nxReferenceCard-"]):not(.btn-send),body.nx-4d .icon-btn{background:rgba(20,26,44,.8)!important;color:var(--n4-txt)!important;border:1px solid var(--n4-stroke)!important;border-radius:var(--n4-r-sm)!important;transition:border-color .2s,box-shadow .2s,background .2s}
-body.nx-4d button:not([id^="nxReferenceCard-"]):hover,body.nx-4d .icon-btn:hover{border-color:var(--n4-stroke-hi)!important;box-shadow:0 0 18px rgba(0,229,255,.15)!important}
-body.nx-4d button.primary,body.nx-4d .btn-new,body.nx-4d .nx-partner.active,body.nx-4d .toggle.on,body.nx-4d .toggle.active,body.nx-4d #btnLiveHub[aria-expanded="true"]{background:linear-gradient(135deg,rgba(0,229,255,.22),rgba(138,92,255,.28))!important;border-color:rgba(0,229,255,.45)!important;color:#fff!important}
-body.nx-4d .btn-send{background:linear-gradient(135deg,var(--n4-cyan),var(--n4-violet))!important;color:#05060a!important;border:none!important;box-shadow:0 6px 24px rgba(0,229,255,.35)!important}
-body.nx-4d input,body.nx-4d textarea,body.nx-4d select{background:rgba(10,13,22,.85)!important;color:var(--n4-txt)!important;border:1px solid var(--n4-stroke)!important;border-radius:var(--n4-r-sm)!important}
+body.nx-4d button:not([id^="nxReferenceCard-"]):not(.btn-send):not(#btnZocker),body.nx-4d .icon-btn{background:rgba(255,255,255,.55)!important;color:var(--n4-txt)!important;border:1px solid var(--n4-stroke)!important;border-radius:var(--n4-r-sm)!important;transition:border-color .2s,box-shadow .2s,background .2s}
+body.nx-4d button:not([id^="nxReferenceCard-"]):not(#btnZocker):hover,body.nx-4d .icon-btn:hover{border-color:var(--n4-stroke-hi)!important;box-shadow:0 0 18px rgba(57,255,20,.22)!important}
+body.nx-4d button.primary,body.nx-4d .btn-new,body.nx-4d .nx-partner.active,body.nx-4d .toggle.on,body.nx-4d .toggle.active,body.nx-4d #btnLiveHub[aria-expanded="true"]{background:linear-gradient(135deg,rgba(57,255,20,.28),rgba(201,180,232,.40))!important;border-color:rgba(57,255,20,.55)!important;color:#12203a!important}
+body.nx-4d .btn-send{background:linear-gradient(135deg,var(--n4-neon),var(--n4-lilac))!important;color:#12203a!important;border:none!important;box-shadow:0 6px 24px rgba(57,255,20,.35)!important}
+body.nx-4d input,body.nx-4d textarea,body.nx-4d select{background:rgba(255,255,255,.72)!important;color:var(--n4-txt)!important;border:1px solid rgba(90,61,154,.22)!important;border-radius:var(--n4-r-sm)!important}
 body.nx-4d input::placeholder,body.nx-4d textarea::placeholder{color:var(--n4-dim)!important}
-body.nx-4d input:focus,body.nx-4d textarea:focus,body.nx-4d select:focus{outline:none!important;border-color:var(--n4-stroke-hi)!important;box-shadow:0 0 0 3px rgba(0,229,255,.12)!important}
+body.nx-4d input:focus,body.nx-4d textarea:focus,body.nx-4d select:focus{outline:none!important;border-color:var(--n4-stroke-hi)!important;box-shadow:0 0 0 3px rgba(57,255,20,.18)!important}
 body.nx-4d :focus-visible{outline:2px solid var(--n4-cyan)!important;outline-offset:2px!important}
-body.nx-4d option{background:var(--n4-bg2);color:var(--n4-txt)}
+body.nx-4d option{background:#f4f7fc;color:var(--n4-txt)}
 
 /* Sidebar-Navigation: aktiver Cyan-Indikator */
 body.nx-4d #sideNav a,body.nx-4d #sideNav button{position:relative;color:var(--n4-txt)!important;border-radius:var(--n4-r-sm)!important}
-body.nx-4d #sideNav .active,body.nx-4d #sessionList .active{background:rgba(0,229,255,.10)!important}
+body.nx-4d #sideNav .active,body.nx-4d #sessionList .active{background:rgba(57,255,20,.14)!important}
 body.nx-4d #sideNav .active::before,body.nx-4d #sessionList .active::before{content:"";position:absolute;left:-8px;top:20%;bottom:20%;width:3px;border-radius:3px;background:var(--n4-cyan);box-shadow:0 0 12px var(--n4-cyan)}
 
 /* Chat-Nachrichten */
-body.nx-4d .msg-body,body.nx-4d .bubble,body.nx-4d .msg .content{background:rgba(17,21,36,.78)!important;color:var(--n4-txt)!important;border:1px solid var(--n4-stroke)!important;border-radius:16px!important}
-body.nx-4d .msg-row.user .msg-body,body.nx-4d .msg.user .bubble{background:linear-gradient(135deg,rgba(0,229,255,.14),rgba(138,92,255,.18))!important;border-color:rgba(0,229,255,.3)!important}
-body.nx-4d pre,body.nx-4d code{background:rgba(5,6,10,.85)!important;color:#cfe3ff!important;border-color:var(--n4-stroke)!important}
-body.nx-4d #nxTermOut{background:#04050a!important;color:#b8ffcf!important}
+body.nx-4d .msg-body,body.nx-4d .bubble,body.nx-4d .msg .content{background:rgba(248,252,255,.88)!important;color:var(--n4-txt)!important;border:1px solid rgba(255,255,255,.80)!important;border-radius:16px!important}
+body.nx-4d .msg-row.user .msg-body,body.nx-4d .msg.user .bubble{background:linear-gradient(135deg,#2f4f8a,#5A3D9A)!important;border-color:rgba(90,61,154,.45)!important;color:#fff!important}
+body.nx-4d pre,body.nx-4d code{background:rgba(18,32,58,.08)!important;color:#12203a!important;border-color:rgba(90,61,154,.22)!important}
+body.nx-4d #nxTermOut{background:rgba(255,255,255,.70)!important;color:#12203a!important}
 
 /* Avatare: restlos weg */
 body.nx-4d .avatar,body.nx-4d [class*="avatar"],body.nx-4d [id*="Avatar"],body.nx-4d [id*="avatar"],body.nx-4d img[src*="avatar"],body.nx-4d .nx-face,body.nx-4d #nxVrmFrame{display:none!important}

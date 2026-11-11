@@ -13,9 +13,9 @@ sys.path.insert(0, str(ROOT))
 from nexus import phone_actions as pa  # noqa: E402
 
 MDNS = ("List of discovered mdns services\n"
-        "adb-249ac5d7-ce0m6u\t_adb-tls-connect._tcp\t192.168.178.56:38041\n"
-        "adb-deadbeef-xx\t_adb-tls-connect._tcp\t192.168.178.99:40000\n"
-        "adb-249ac5d7-ce0m6u\t_adb-tls-pairing._tcp\t192.168.178.56:41111\n")
+        "adb-249ac5d7-ce0m6u\t_adb-tls-connect._tcp\t192.0.2.56:38041\n"
+        "adb-deadbeef-xx\t_adb-tls-connect._tcp\t192.0.2.99:40000\n"
+        "adb-249ac5d7-ce0m6u\t_adb-tls-pairing._tcp\t192.0.2.56:41111\n")
 
 
 class Base(unittest.TestCase):
@@ -83,7 +83,7 @@ class Reconnect(Base):
         md = pa.parse_mdns(MDNS)
         self.assertEqual(len(md), 2)  # pairing-Dienst ignoriert
         c = pa.reconnect_candidates(md, {"serialno": "249ac5d7"})
-        self.assertEqual(c, ["192.0.2.10:38041", "192.0.2.10:38041"])
+        self.assertEqual(c, ["192.0.2.56:38041", "192.0.2.10:38041"])
         self.assertEqual(pa.reconnect_candidates([], {"serialno": "249ac5d7", "last_port": 38041}), ["192.0.2.10:38041"])
         self.assertEqual(pa.reconnect_candidates(md, {}), [])  # unbekannt + mehrere -> nichts raten
 
@@ -101,7 +101,7 @@ class Reconnect(Base):
         calls, run = self._run(lambda ep: f"connected to {ep}")
         with patch.object(pa, "_run", side_effect=run):
             r = pa.reconnect_once()
-        self.assertEqual(r, {"success": True, "endpoint": "192.0.2.10:38041"})
+        self.assertEqual(r, {"success": True, "endpoint": "192.0.2.56:38041"})
         for c in calls:
             self.assertIn(c[0], ("mdns", "connect"))
         self.assertEqual(json.loads(pa.IDENTITY_PATH.read_text(encoding="utf-8"))["last_port"], 38041)

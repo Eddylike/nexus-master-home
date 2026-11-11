@@ -26,6 +26,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DIR = ROOT / "workspace" / "nexus_os_link"
 _LOCK = threading.Lock()
+_PAIRED_SEEN: dict[str, Any] = {}
 _NETS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "192.0.2.11/10", "192.0.2.12/16", "::1/128", "fd7a:115c:a1e0::/48")]
 _PROXY_HDRS = ("X-Forwarded-For", "Tailscale-User-Login", "X-Forwarded-Host", "Forwarded")
 KINDS = ("chat", "voice", "ai", "event", "pc_command", "ctx")
@@ -109,6 +110,39 @@ def device_post(body: dict[str, Any], ip: str) -> tuple[int, dict[str, Any]]:
         DIR.mkdir(parents=True, exist_ok=True)
         _f("device.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
     return 200, {"success": True, "stored": sorted(k for k in rec if k in DEVICE_KEYS), "pc": link_status()}
+
+
+def note_paired_contact(ip: str, path: str) -> None:
+    """MOBILE 20261109: remembers the last request that carried a VALID pairing Bearer
+    (only called after pc_remote.authenticate succeeded). Stores time + route kind only,
+    never the token or its hash."""
+    try:
+        rec = {"ts": time.time(), "path": str(path)[:60],
+               "route_ip_kind": "tailscale" if ip.startswith("100.") else ("lan" if ip.startswith("192.168.") else "local")}
+        with _LOCK:
+            _PAIRED_SEEN.clear()
+            _PAIRED_SEEN.update(rec)
+            if os.name != "nt" or DIR.resolve().drive.upper() == "G:":
+                DIR.mkdir(parents=True, exist_ok=True)
+                _f("paired_contact.json").write_text(json.dumps(rec, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def paired_contact_get() -> dict[str, Any] | None:
+    """Last authenticated (paired) app contact with age_s, or None if never seen."""
+    with _LOCK:
+        rec = dict(_PAIRED_SEEN)
+    if not rec:
+        try:
+            rec = json.loads(_f("paired_contact.json").read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    try:
+        rec["age_s"] = round(time.time() - float(rec.get("ts") or 0), 1)
+    except (TypeError, ValueError):
+        return None
+    return rec
 
 
 def device_get() -> tuple[int, dict[str, Any]]:
@@ -277,6 +311,8 @@ def handle(method: str, path: str, ip: str, headers: Any, qs: dict | None = None
             principal, error = authenticate(headers)
             if error and (headers.get("Authorization") or headers.get("authorization")):
                 return 401, {"success": False, "error": error}
+            if principal:
+                note_paired_contact(ip, "GET /api/nexus-os/sync")
             return sync_get(qs or {}, principal)
         if path == "/api/nexus-os/link":
             from nexus.pc_remote import capabilities
@@ -299,6 +335,7 @@ def handle(method: str, path: str, ip: str, headers: Any, qs: dict | None = None
             principal, error = authenticate(headers)
             if error:
                 return 401, {"success": False, "error": error}
+            note_paired_contact(ip, "POST /api/nexus-os/sync")
         return sync_post(body, principal, engine)
     if path == "/api/nexus-os/push":
         if not _loopback(ip):

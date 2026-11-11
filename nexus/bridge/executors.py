@@ -18,6 +18,7 @@ from nexus.bridge.errors import (
     PATH_DENIED,
     PATH_TRAVERSAL,
     INVALID_REQUEST,
+    NOT_FOUND,
     SCRIPT_DENIED,
     ACTION_DENIED,
     NOT_IMPLEMENTED,
@@ -244,7 +245,9 @@ def exec_inspect_server(params: dict[str, Any], rec: TaskRecord) -> dict[str, An
 
 def exec_read_file(params: dict[str, Any], rec: TaskRecord) -> dict[str, Any]:
     path = params.get("path") or params.get("file") or ""
-    fp = _safe_path(str(path), must_exist=True)
+    fp = _safe_path(str(path))
+    if not fp.exists():
+        raise BridgeError(NOT_FOUND, f"path not found: {fp}", http_status=404)
     if not fp.is_file():
         raise BridgeError(INVALID_REQUEST, "not a file", http_status=400)
     data = fp.read_bytes()
@@ -1335,7 +1338,7 @@ def _manifest_local() -> Path:
     return _PHASE_A_ROOT / "phase_a_manifest.json"
 
 
-# ---- Phone control path (2026-10-06): the retired NEXUS_TERMUX_AGENT on 8765 is no longer used.
+# ---- Phone control path (2026-10-06): the retired NEXUS_TERMUX_AGENT on retired-port is no longer used.
 # All phone actions go to the Phase-A control service (Termux, 127.0.0.1:8766 on the phone)
 # through an idempotent host-side adb forward tcp:18766 -> tcp:8766 (nexus_os.ensure_adb_forward).
 _DEVICE_ERROR_CODES = {"NO_DEVICE", "DEVICE_UNAUTHORIZED", "DEVICE_OFFLINE", "SERIAL_NOT_FOUND", "ADB_NOT_FOUND"}
@@ -1418,7 +1421,7 @@ _LEGACY_TERMUX_ACTIONS = {
 
 def _termux_agent_request(params: dict[str, Any], action: str) -> dict[str, Any]:
     if action == "patch_nexus_start_agent":
-        raise BridgeError(ACTION_DENIED, "obsolete: legacy 8765 agent retired; autostart via Phase-A autostart_ensure (~/.termux/boot/nexus-boot.sh)", http_status=410)
+        raise BridgeError(ACTION_DENIED, "obsolete: legacy agent retired; autostart via Phase-A autostart_ensure (~/.termux/boot/nexus-boot.sh)", http_status=410)
     target = _LEGACY_TERMUX_ACTIONS.get(action)
     if not target:
         raise BridgeError(ACTION_DENIED, "termux action denied", http_status=403)
@@ -1800,20 +1803,9 @@ def bind_default_executors(manager: TaskManager) -> None:
         "android_screenshot": exec_android_screenshot,
         "android_push_file": exec_android_push_file,
         "android_push_tree": exec_android_push_tree,
-        "termux_install_nexus_phase_a": exec_termux_install_nexus_phase_a,
-        "termux_file_status": exec_termux_file_status,
-        "termux_patch_nexus_start_agent": exec_termux_patch_nexus_start_agent,
-        "termux_start_nexus": exec_termux_start_nexus,
-        "termux_stop_nexus": exec_termux_stop_nexus,
-        "termux_restart_nexus": exec_termux_restart_nexus,
-        "termux_status_nexus": exec_termux_status_nexus,
-        "termux_phase_a_control": exec_termux_phase_a_control,
-        "check_phase_a_stage_cleaned": exec_check_phase_a_stage_cleaned,
         "restart_nexus_bridge_exact": exec_restart_nexus_bridge_exact,
         "install_krita_portable": exec_install_krita_portable,
         "krita_gui_test": exec_krita_gui_test,
-        "deploy_phase_a_control": exec_deploy_phase_a_control,
-        "provision_bridge_token_to_phone": exec_provision_bridge_token_to_phone,
         "android_install_apk": exec_android_install_apk,
         "mouse_move": exec_mouse_move,
         "pc_music": exec_pc_music,

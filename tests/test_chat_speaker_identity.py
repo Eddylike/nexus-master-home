@@ -185,7 +185,7 @@ class ChatSpeakerIdentityTests(unittest.TestCase):
         self.handler_scope["traceback"].print_exc.assert_not_called()
 
     def test_agent_routes_reject_non_loopback_before_provider(self):
-        self.handler.client_address = ("192.0.2.11", 1234)
+        self.handler.client_address = ("192.168.1.50", 1234)
         self.handler.headers = {}
         self.handler.path = "/api/aether/agent"
         for path in ("/api/aether/agent", "/api/aether/supervisor", "/api/hermes/agent",

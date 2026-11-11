@@ -124,9 +124,12 @@ class SharedRoom:
         digest = self._hash(sender_type, target_norm, scope + "|" + text)
         with self._lock, file_lock(self._path(session_id)):
             room = self.load(session_id)
-            recent = room.get("messages", [])[-64:]
+            if not room.get("messages"):
+                room["messages"] = []
+            recent = room["messages"][-64:]
             if any(m.get("message_hash") == digest for m in recent):
                 return {"success": False, "blocked": "duplicate"}
+            # Status-Logik fuer Agenten-Raum: FAIL/PARTIAL/BLOCKED bei Fehlern
             rec = {
                 "message_id": "MSG-" + uuid.uuid4().hex[:16], "session_id": session_id,
                 "timestamp": _now(), "sender_type": sender_type, "sender_name": sender_name,

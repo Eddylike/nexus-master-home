@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 BASE = os.environ.get("NEXUS_TEST_BASE", "http://127.0.0.1:8299")
 GW = os.environ.get("NEXUS_TEST_GW", "http://127.0.0.1:8300")
-PUBLIC = os.environ.get("NEXUS_TEST_PUBLIC", "https://wozipc-nexus.tailaf0b38.ts.net")
+PUBLIC = os.environ.get("NEXUS_TEST_PUBLIC", "https://wozipc-nexus.example.ts.net")
 TOKEN_FILE = ROOT / "workspace" / "bridge" / ".token"
 
 RESULTS: list[tuple[str, bool, str]] = []

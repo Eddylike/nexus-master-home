@@ -60,6 +60,6 @@ def test_st04_social_formats_and_api(lib):
         assert im.size == (1080, 1080)
     code, r = api.handle("POST", "/api/studio/filter", {}, {"id": iid, "name": "hdr"}, "127.0.0.1", studio=st)
     assert code == 200 and r["version"]["op"] == "filter_hdr"
-    assert api.handle("POST", "/api/studio/filter", {}, {"id": iid, "name": "hdr"}, "192.0.2.12", studio=st)[0] == 403
+    assert api.handle("POST", "/api/studio/filter", {}, {"id": iid, "name": "hdr"}, "10.0.0.5", studio=st)[0] == 403
     code, r = api.handle("GET", "/api/studio/fx", {}, None, "127.0.0.1", studio=st)
     assert code == 200 and "vignette" in r["filters"]

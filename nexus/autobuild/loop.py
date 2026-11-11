@@ -1,4 +1,4 @@
-﻿"""Autonomer Selbstbau-Zyklus: Backlog waehlen -> planen -> bauen -> testen -> uebernehmen/Rollback -> Bericht.
+"""Autonomer Selbstbau-Zyklus: Backlog waehlen -> planen -> bauen -> testen -> uebernehmen/Rollback -> Bericht.
 
 - Laeuft als Daemon-Thread im NEXUS-Server (BelowNormal-Testprozesse, 1 Zyklus gleichzeitig).
 - Pausiert bei Gaming oder RAM > RAM_LIMIT.
@@ -9,19 +9,24 @@ from __future__ import annotations
 
 import ast
 import json
+import logging
+import os
 import re
+from nexus.autobuild.scaffold import ensure_target_scaffold as _ensure_scaffold_impl
 import shutil
 import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from nexus.autobuild.guard import CDriveBlocked, check_write, child_env
 from nexus.common.paths import ROOT
+from nexus.platform.display import DisplayUnavailable
 
 DIR = ROOT / "workspace" / "autobuild"
 BACKLOG = DIR / "backlog.json"
@@ -29,9 +34,11 @@ CYCLES = DIR / "cycles.jsonl"
 PROGRESS = ROOT / "workspace" / "auftraege" / "SELBSTBAU_FORTSCHRITT.md"
 STOP_FILE = DIR / "STOP"
 INTERVAL_SEC = 900
+RAM_WARN_PERCENT = 85
+RAM_PAUSE_PERCENT = 92
 FIRST_DELAY_SEC = 180
 RAM_LIMIT = 92.0
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS_PER_ITEM = 3
 GAMES = re.compile(r"(?i)^(EscapeFromTarkov|BsgLauncher|steam_?game|cs2|FortniteClient|RocketLeague|GTA5|eldenring|bf2042|valorant|r5apex)")
 BELOW_NORMAL = 0x00004000
 from nexus.common.ai_layer import unified_num_ctx as _unified_ctx
@@ -69,11 +76,26 @@ def _write(path: Path, text: str, mode: str = "w") -> None:
         fh.write(text)
 
 
-def load_backlog() -> list[dict]:
+_SNAPSHOT: dict = {}  # 20261104_merge: Stand je id beim letzten Laden/Speichern
+
+
+def _key(i) -> str:
+    return json.dumps(i, ensure_ascii=False, sort_keys=True)
+
+
+def _read_disk() -> list[dict]:
     try:
-        return json.loads(BACKLOG.read_text(encoding="utf-8"))
+        data = json.loads(BACKLOG.read_text(encoding="utf-8-sig"))
+        return data if isinstance(data, list) else []
     except Exception:
         return []
+
+
+def load_backlog() -> list[dict]:
+    items = _read_disk()
+    _SNAPSHOT.clear()
+    _SNAPSHOT.update({str(i.get("id")): _key(i) for i in items if isinstance(i, dict)})
+    return items
 
 
 def _load_json(path: Path, default):
@@ -83,16 +105,45 @@ def _load_json(path: Path, default):
         return default
 
 
+def merge_backlog(disk: list[dict], items: list[dict], snapshot: dict) -> list[dict]:
+    """Merge statt Overwrite: nur Eintraege uebernehmen, die dieser Prozess seit dem Laden geaendert oder neu
+    angelegt hat. Fremd hinzugefuegte/geaenderte Eintraege auf der Platte bleiben erhalten."""
+    out = list(disk)
+    pos = {str(d.get("id")): n for n, d in enumerate(out) if isinstance(d, dict)}
+    for i in items:
+        if not isinstance(i, dict):
+            continue
+        k = str(i.get("id"))
+        if snapshot.get(k) == _key(i):
+            continue  # unveraendert -> Plattenstand gewinnt
+        if k in pos:
+            out[pos[k]] = i
+        else:
+            out.append(i)
+            pos[k] = len(out) - 1
+    return out
+
+
 def save_backlog(items: list[dict]) -> None:
-    _write(BACKLOG, json.dumps(items, ensure_ascii=False, indent=2))
+    merged = merge_backlog(_read_disk(), items, _SNAPSHOT)
+    text = json.dumps(merged, ensure_ascii=False, indent=2)
+    target = check_write(BACKLOG)
+    tmp = target.with_name(target.name + ".tmp")
+    _write(tmp, text)
+    os.replace(tmp, target)  # atomar, UTF-8 ohne BOM
+    _SNAPSHOT.clear()
+    _SNAPSHOT.update({str(i.get("id")): _key(i) for i in merged if isinstance(i, dict)})
+    items[:] = merged
 
 
 def system_busy() -> str | None:
     try:
         import psutil
         ram = psutil.virtual_memory().percent
-        if ram > RAM_LIMIT:
-            return f"RAM {ram:.0f}% > {RAM_LIMIT:.0f}%"
+        if ram >= RAM_PAUSE_PERCENT:
+            return f"RAM-SCHUTZ: {ram:.0f}% >= {RAM_PAUSE_PERCENT}% – Autobuild pausiert"
+        if ram >= RAM_WARN_PERCENT:
+            _emit("NEXUS", "warning", f"RAM-WARNUNG: {ram:.0f}% – Selbstbau läuft weiter")
         for pr in psutil.process_iter(["name"]):
             n = (pr.info.get("name") or "").rsplit(".", 1)[0]
             if GAMES.match(n):
@@ -124,6 +175,24 @@ def _excerpt(item: dict) -> tuple[str, str]:
 
 class _TestsFailed(Exception):
     """Tests nach Patch rot -> 1 Korrekturrunde mit Testfehlern (20261029)."""
+
+
+class AnchorMissing(ValueError):
+    """A patch anchor is absent, so retrying the same delegate cannot help."""
+
+
+def apply_patch(text: str, anchor: str, replacement: str) -> str:
+    """Apply one normalized text patch without treating an existing result as failure."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    anchor = anchor.replace("\r\n", "\n").replace("\r", "\n")
+    replacement = replacement.replace("\r\n", "\n").replace("\r", "\n")
+    if replacement in text:
+        return "already_applied"
+    if anchor not in text:
+        raise AnchorMissing("PATCH_ANCHOR_MISSING")
+    if text.count(anchor) != 1:
+        raise AnchorMissing("PATCH_ANCHOR_AMBIGUOUS")
+    return text.replace(anchor, replacement, 1)
 
 
 def _ws_norm(line: str) -> str:
@@ -163,9 +232,11 @@ def _compute_edits(edits: list) -> dict:
             e[k] = str(e[k]).replace("\r\n", "\n").replace("\r", "\n")  # Ausschnitt-Kopfzeilen ("# --- Betroffen: ...") sind kein Dateiinhalt
             e[k] = "\n".join(x for x in str(e[k]).split("\n") if not x.lstrip().startswith("# --- "))
         target = check_write(ROOT / e["file"])
-        cur = new_texts.get(target) or target.read_text(encoding="utf-8")
-        n = cur.count(e["find"])
-        if n == 0:  # tolerant: Zeilen mit abweichender Einrueckung/Leerzeichen am Ende eindeutig zuordnen
+        cur = (new_texts.get(target) or target.read_text(encoding="utf-8")).replace("\r\n", "\n").replace("\r", "\n")
+        try:
+            patched = apply_patch(cur, e["find"], e["replace"])
+        except AnchorMissing:
+            # Tolerant: Zeilen mit abweichender Einrueckung/Leerzeichen am Ende eindeutig zuordnen.
             fl = [_ws_norm(x) for x in e["find"].strip("\n").splitlines()]
             while fl and not fl[-1]:
                 fl.pop()
@@ -178,11 +249,14 @@ def _compute_edits(edits: list) -> dict:
                 base = min((len(r) - len(r.lstrip()) for r in rl if r.strip()), default=0)
                 rep = "".join(ind + r[base:] + "\n" if r.strip() else "\n" for r in rl)
                 cur = "".join(cl[:i]) + rep + "".join(cl[i + len(fl):])
-                n = -1
-        if n not in (1, -1):
-            raise ValueError(f"FIND_MATCHES_{n}:{e['file']}")
-        if n == 1:
-            cur = cur.replace(e["find"], e["replace"], 1)
+            else:
+                reason = "PATCH_ANCHOR_AMBIGUOUS" if len(hits) > 1 else "PATCH_ANCHOR_MISSING"
+                raise AnchorMissing(f"{reason}:{e['file']}") from None
+        else:
+            if patched == "already_applied":
+                new_texts[target] = cur
+                continue
+            cur = patched
         if target.suffix == ".py":
             _syntax_check(cur, e["file"])
         new_texts[target] = cur
@@ -507,10 +581,90 @@ def fn_mode_applicable(item: dict) -> bool:
     return bool(name) and len(src.splitlines()) <= FN_MAX_LINES
 
 
+# ---------- Mehr-Stub-Modus (20261104_multistub) ----------
+MULTI_FILE_MAX_CHARS = 12000  # volle Zieldatei als Kontext (SZ-Module ~2-3 KB, Puffer fuer groessere Stub-Dateien)
+MULTI_TEST_MAX_CHARS = 6000   # regression_test-Datei; bisher 2500 fuer acceptance-Datei, Tests ueber alle Stubs sind laenger
+
+
+def stub_functions(text: str) -> list[str]:
+    """Top-Level-Funktionen, deren Rumpf `raise NotImplementedError` enthaelt (Reihenfolge der Datei)."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+    out = []
+    for n in tree.body:
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            for s in ast.walk(n):
+                if isinstance(s, ast.Raise) and s.exc is not None:
+                    e = s.exc.func if isinstance(s.exc, ast.Call) else s.exc
+                    if isinstance(e, ast.Name) and e.id == "NotImplementedError":
+                        out.append(n.name)
+                        break
+    return out
+
+
+def multi_stub_prompt(item: dict, text: str, stubs: list[str], test_text: str = "") -> str:
+    f = item["file"]
+    return (f"Du bist NEXUS GPT. Implementiere ALLE Stub-Funktionen einer Python-Datei vollstaendig in einem Schritt.\n"
+            f"Aufgabe: {item['title']}\nZiel: {item.get('goal','')}\n{_notes_text(item)}"
+            f"Datei: {f}\nZu implementierende Funktionen (alle, jeweils gleiche Signatur): {', '.join(stubs)}\n"
+            f"Komplette aktuelle Datei:\n```python\n{text[:MULTI_FILE_MAX_CHARS]}\n```\n"
+            + (f"Abnahmetest (muss komplett bestehen, derzeit rot):\n```python\n{test_text[:MULTI_TEST_MAX_CHARS]}\n```\n" if test_text else "") +
+            "Regeln: Schreibe JEDE genannte Funktion GANZ neu (def-Zeile + Rumpf), Signaturen nicht aendern, kein NotImplementedError mehr. "
+            "Modul-Konstanten nicht aendern. Nur lokal, keine Pfade auf C:, keine Netzwerkzugriffe. "
+            "KEINE Docstrings und keine dreifachen Anfuehrungszeichen (nur # Kommentare); Code muss mit ast.parse fehlerfrei sein. "
+            "Hilfsfunktionen erlaubt. AUSGABEFORMAT (kein JSON): genau EIN Codeblock ```python mit benoetigten Import-Zeilen oben, "
+            "dann alle Funktionen. Danach eine Zeile 'Begruendung: ...'.")
+
+
+def _syntax_hint(reply: str, err: str) -> str:
+    """Bei FN_SYNTAX die fehlerhafte Zeile des Codeblocks zurueckmelden (Mehr-Stub-Modus)."""
+    import re as _re
+    m = _re.search(r"Block-Zeile (\d+)", err)
+    blocks = _re.findall(r"```(?:python|py)?[ \t]*\n(.*?)```", reply or "", _re.S | _re.I)
+    if not m or not blocks:
+        return ""
+    ls = blocks[0].replace("\r\n", "\n").split("\n")
+    n = int(m.group(1))
+    if 1 <= n <= len(ls):
+        return (f"\nSyntaxfehler in deiner Zeile {n}: `{ls[n-1].strip()}` - Bezeichner nur ASCII ohne Leerzeichen, "
+                "Variablennamen konsistent verwenden.")
+    return ""
+
+
+def plan_multi_stub(item: dict, text: str, stubs: list[str], ask: Callable[[str], str]) -> dict:
+    rt = item.get("regression_test") or ""
+    test_text = (ROOT / rt).read_text(encoding="utf-8") if rt and (ROOT / rt).is_file() else ""
+    prompt = multi_stub_prompt(item, text, stubs, test_text) + _korrektur_text(item)
+    if item.get("last_test_output"):
+        prompt += "\nLetzter Versuch scheiterte an diesen Testfehlern, vermeide sie:\n" + item["last_test_output"]
+    last = None
+    for _ in range(3):
+        reply = ""
+        try:
+            reply = ask(prompt)
+            res = parse_code_blocks(reply, item["file"], stubs[0])
+            got = {e.get("function") for e in res.get("edits") or []}
+            miss = [s for s in stubs if s not in got]
+            if miss:
+                raise ValueError("STUBS_MISSING:" + ",".join(miss))
+            return {"mode": "patch", "fn_mode": True, "multi_stub": stubs, "result": res}
+        except ValueError as e:
+            last = e
+            prompt += _syntax_hint(reply, str(e))
+            prompt += (f"\nACHTUNG: Letzte Antwort unbrauchbar ({e}). Liefere genau einen ```python-Block mit ALLEN "
+                       f"Funktionen: {', '.join(stubs)}.")
+    raise last
+
+
 def plan_function(item: dict, ask: Callable[[str], str] | None = None) -> dict:
     ask = ask or _gpt_text
     f = item["file"]
     text = (ROOT / f).read_text(encoding="utf-8")
+    stubs = stub_functions(text)  # 20261104_multistub: mehrere Stubs -> alle in einem Zyklus
+    if len(stubs) > 1:
+        return plan_multi_stub(item, text, stubs, ask)
     lines = text.splitlines()
     idx = next(i for i, ln in enumerate(lines) if _anchor_hit(item.get("anchor") or "", ln))
     name, src = _function_excerpt(text, idx)
@@ -819,10 +973,51 @@ def record_issue(items: list[dict], source: str, error: str, excerpt: str) -> di
     it["count"] = int(it.get("count") or 0) + 1
     it["last_seen"] = _now()
     it["logs"] = (it.get("logs") or [])[-2:] + [str(excerpt)[:400]]
-    if it["count"] >= 2 and it.get("status") in ("beobachtet", "erledigt", "analysiert"):
+    if it["count"] >= 2 and it.get("status") == "beobachtet":
         it["status"] = "offen"
     _emit("NEXUS", "selbstheilung", f"{it['id']} {code} ({it['count']}x, {it['status']})", ok=None)
     return it
+
+
+
+def ensure_target_scaffold(item: dict) -> str | None:
+    """Wrapper: fehlende Ziel-Dateien stubben (PLAN FileNotFound / FIND_MATCHES_0)."""
+    return _ensure_scaffold_impl(root=ROOT, check_write=check_write, item=item)
+
+
+def _deps_satisfied(item: dict, by_id: dict[str, dict]) -> bool:
+    """depends_on/deps: alle genannten IDs muessen status==erledigt sein."""
+    deps = item.get("depends_on") if item.get("depends_on") is not None else item.get("deps")
+    if not deps:
+        return True
+    if not isinstance(deps, (list, tuple)):
+        return True
+    for d in deps:
+        dep = by_id.get(str(d))
+        if dep is None or str(dep.get("status")) != "erledigt":
+            return False
+    return True
+
+
+def pick_next_item(items: list[dict], item_id: str | None = None) -> dict | None:
+    """Return the next actionable backlog item, blocking exhausted items first.
+    Respektiert depends_on/deps (nur wenn alle deps erledigt)."""
+    by_id = {str(i.get("id")): i for i in items if isinstance(i, dict) and i.get("id") is not None}
+    candidates = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        st = str(item.get("status") or "")
+        if st in ("offen", "fehlgeschlagen", "freigegeben") and (not item_id or item.get("id") == item_id):
+            if int(item.get("attempts") or 0) >= MAX_ATTEMPTS_PER_ITEM:
+                item["status"] = "blocked"
+                continue
+            if not _deps_satisfied(item, by_id):
+                continue
+            candidates.append(item)
+    candidates.sort(key=lambda item: (-int(item.get("prio") or 0),
+                                      0 if str(item.get("id", "")).startswith("SB-AUTO-") else 1))
+    return candidates[0] if candidates else None
 
 
 
@@ -911,6 +1106,7 @@ class Autobuild:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self.log = logging.getLogger(__name__)
         self.tests_runner = tests_runner or _run_tests
         self.planner = planner or plan_edits
         self.hermes = hermes or _hermes_report
@@ -945,21 +1141,71 @@ class Autobuild:
     def _loop(self) -> None:
         if self._stop.wait(FIRST_DELAY_SEC):
             return
+
+        _emit("NEXUS", "start",
+              "Kontinuierlicher Selbstbau aktiviert", ok=True)
+
         while not self._stop.is_set() and not STOP_FILE.exists():
-            try:
-                self.cycle()
-            except Exception as e:
-                _emit("NEXUS", "error", f"Selbstbau-Zyklus Fehler: {e}", ok=False)
+
+            # Alle aktuell bearbeitbaren Aufgaben nacheinander abarbeiten
+            while not self._stop.is_set() and not STOP_FILE.exists():
+                try:
+                    result = self.cycle()
+
+                    state = (
+                        result.get("result")
+                        if isinstance(result, dict)
+                        else None
+                    )
+
+                    if state == "NICHTS_OFFEN":
+                        _emit("NEXUS", "status",
+                              "Alle aktuell bearbeitbaren Aufgaben abgearbeitet")
+                        break
+
+                    if state == "PAUSIERT":
+                        _emit("NEXUS", "status",
+                              "System belegt; erneuter Versuch folgt")
+                        if self._stop.wait(30):
+                            return
+                        continue
+
+                    if state == "CYCLE_RUNNING":
+                        if self._stop.wait(2):
+                            return
+                        continue
+
+                    # Fehler werden im Backlog dokumentiert.
+                    # Der nächste Durchlauf übernimmt den nächsten Punkt,
+                    # sobald der vorherige blockiert oder abgeschlossen ist.
+                    if self._stop.wait(1):
+                        return
+
+                except Exception as e:
+                    self.log.error("Traceback:\n%s", traceback.format_exc())
+                    _emit("NEXUS", "error",
+                          f"Selbstbau-Fehler: {type(e).__name__}: {e}",
+                          ok=False)
+                    if self._stop.wait(5):
+                        return
+
+            if self._stop.is_set() or STOP_FILE.exists():
+                break
+
+            # Backlog regelmäßig auf neu hinzugekommene Aufgaben prüfen
             if self._stop.wait(INTERVAL_SEC):
                 break
 
+        _emit("NEXUS", "stop", "Selbstbau beendet")
     # ---------- Zyklus ----------
     def cycle(self, item_id: str | None = None, full_suite: bool = True) -> dict:
         if not self._lock.acquire(blocking=False):
             return {"success": False, "error": "CYCLE_RUNNING"}
         self.running_cycle = True
         try:
-            return self._cycle(item_id, full_suite)
+            result = self._cycle(item_id, full_suite)
+            self.last = result
+            return result
         finally:
             self.running_cycle = False
             self._lock.release()
@@ -984,14 +1230,20 @@ class Autobuild:
                 if i.get("phase") == 2 and i.get("status") == "wartet_phase1":
                     i["status"] = "offen"
             save_backlog(items)
-        cand = [i for i in items if i.get("status") in ("offen", "fehlgeschlagen") and (not item_id or i["id"] == item_id)]
-        if not cand:
+        item = pick_next_item(items, item_id)
+        if item is None:
+            save_backlog(items)
             rec.update(result="NICHTS_OFFEN")
             return self._finish(rec)
-        cand.sort(key=lambda i: (-int(i.get("prio") or 0), 0 if str(i.get("id", "")).startswith("SB-AUTO-") else 1))  # prio, dann Selbstheilung
-        item = cand[0]
         rec.update(item=item["id"], title=item["title"])
-        if item.get("auto_key") and not item.get("file"):
+        try:
+            sc = ensure_target_scaffold(item)
+            if sc:
+                _emit("NEXUS", "plan", f"{item['id']}: {sc}")
+                rec["scaffold"] = sc
+        except Exception as e:
+            return self._fail(items, item, rec, f"SCAFFOLD_FAILED:{e}")
+        if (item.get("auto_key") or item.get("status") == "freigegeben") and not item.get("file"):
             loc = locate_source(item)
             if loc:
                 item["file"], item["anchor"] = loc
@@ -999,12 +1251,19 @@ class Autobuild:
                 item["tests"] = [item["regression_test"], "tests/test_autobuild.py"]
                 _emit("NEXUS", "plan", f"{item['id']}: Quelle ermittelt {loc[0]}", data={"anchor": loc[1][:120]})
                 save_backlog(items)
+        if item.get("status") == "freigegeben" and not item.get("file"):
+            item["status"] = "blockiert"
+            item["block_reason"] = "SOURCE_NOT_FOUND: Keine passende Quelldatei gefunden."
+            rec.update(result="BLOCKIERT", reason=item["block_reason"])
+            save_backlog(items)
+            return self._finish(rec)
         _emit("NEXUS", "plan", f"Selbstbau {cid}: gewaehlt {item['id']} â€“ {item['title']}")
         try:
             _emit("NEXUS", "delegate", "Entwurf an NEXUS GPT", data={"item": item["id"]})
             plan = self.planner(item)
             _emit("NEXUS-GPT", "result", f"Entwurf fuer {item['id']}: {plan['mode']}", ok=True)
         except Exception as e:
+            self.log.error("Traceback:\n%s", traceback.format_exc())
             return self._fail(items, item, rec, f"PLAN_FAILED:{e}")
         if plan["mode"] == "analysis":
             item["status"] = "analysiert"
@@ -1098,7 +1357,15 @@ class Autobuild:
                     rec["begruendung"] = plan["result"].get("begruendung")
                     continue
                 return self._fail(items, item, rec, "TESTS_FAILED")
+            except DisplayUnavailable as e:
+                self._rollback(backups)
+                item["status"] = "skipped"
+                rec.update(result="SKIPPED", reason=str(e))
+                _emit("NEXUS", "skip", f"{item['id']}: {e}")
+                save_backlog(items)
+                return self._finish(rec)
             except Exception as e:
+                self.log.error("Traceback:\n%s", traceback.format_exc())
                 self._rollback(backups)
                 err = f"{type(e).__name__}:{e}"
                 if not correction_used:  # 1 Korrekturrunde, zaehlt NICHT als Fehlversuch
@@ -1139,7 +1406,7 @@ class Autobuild:
 
     def _fail(self, items, item, rec, reason) -> dict:
         item["attempts"] = int(item.get("attempts") or 0) + 1
-        item["status"] = "blockiert" if item["attempts"] >= MAX_ATTEMPTS else "fehlgeschlagen"
+        item["status"] = "blocked" if item["attempts"] >= MAX_ATTEMPTS_PER_ITEM else "fehlgeschlagen"
         item["last_error"] = reason[:300]
         rec.update(result="ROLLBACK" if rec.get("rollback") or "APPLY" in reason else "FEHLGESCHLAGEN", reason=reason[:300])
         _emit("NEXUS", "error", f"Selbstbau {item['id']}: {reason[:160]}", ok=False)
@@ -1161,7 +1428,7 @@ class Autobuild:
         _write(PENDING, json.dumps(rest, ensure_ascii=False))
 
     def _finish(self, rec: dict) -> dict:
-        rec["success"] = rec.get("result") in ("UEBERNOMMEN", "ANALYSIERT", "PAUSIERT", "NICHTS_OFFEN")
+        rec["success"] = rec.get("result") in ("UEBERNOMMEN", "ANALYSIERT", "PAUSIERT", "NICHTS_OFFEN", "SKIPPED")
         line = (f"\n## Zyklus {rec['cycle']} ({rec['ts']})\n- Punkt: {rec.get('item','-')} {rec.get('title','')}\n"
                 f"- Ergebnis: **{rec.get('result')}** {rec.get('reason','')}\n- Geaendert: {rec.get('changed', [])}\n"
                 f"- Tests Ziel: {(rec.get('test_target') or {}).get('summary','-')} | Suite: {(rec.get('test_full') or {}).get('summary','-')}\n")

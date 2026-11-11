@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0820">
+<title>NEXUS Live Talk</title>
+<style>
+:root{--v:#8b5cf6;--b:#3b82f6;--t:#2dd4bf;--bg:#070616;--fg:#eef2ff;--mut:#94a3b8}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+body{background:radial-gradient(120% 80% at 50% 0%,#1b1547 0%,#0b0a24 45%,#05040f 100%)}
+.app{display:flex;flex-direction:column;height:100%;padding:max(12px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:10px}
+header a{color:var(--mut);text-decoration:none;font-size:22px;padding:4px 8px}
+header h1{font-size:17px;font-weight:600;margin:0;letter-spacing:.04em;background:linear-gradient(90deg,var(--v),var(--b),var(--t));-webkit-background-clip:text;background-clip:text;color:transparent}
+.pill{margin-left:auto;font-size:12px;padding:4px 10px;border-radius:999px;background:#ffffff10;border:1px solid #ffffff18;color:var(--mut);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#64748b}
+.pill.ok .dot{background:var(--t);box-shadow:0 0 8px var(--t)}.pill.warn .dot{background:#f59e0b}.pill.err .dot{background:#ef4444}
+.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0;position:relative}
+#orb{width:min(78vw,380px);height:min(78vw,380px);touch-action:manipulation;cursor:pointer}
+.agent{margin-top:4px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--t);opacity:.9;min-height:18px}
+.statetxt{font-size:13px;color:var(--mut);min-height:18px;margin-top:2px}
+.subs{width:100%;max-width:640px;min-height:120px;max-height:32vh;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;text-align:center;padding:0 6px}
+.you{color:var(--mut);font-size:15px;margin-bottom:8px;min-height:20px}
+.you b{color:#a5b4fc;font-weight:600}
+.ai{font-size:20px;line-height:1.35;font-weight:500;min-height:28px;text-shadow:0 0 18px #3b82f633}
+.ai .rest{opacity:.55}
+.controls{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:12px}
+.btn{border:0;border-radius:50%;width:58px;height:58px;display:grid;place-items:center;background:#ffffff12;color:var(--fg);font-size:22px;border:1px solid #ffffff1f}
+.btn.main{width:82px;height:82px;font-size:30px;background:linear-gradient(135deg,var(--v),var(--b) 55%,var(--t));box-shadow:0 8px 34px #6d5bf055,inset 0 0 0 1px #ffffff30}
+.btn.main.on{background:linear-gradient(135deg,#ef4444,#b91c1c);box-shadow:0 8px 30px #ef444455}
+.btn.off{opacity:.45}
+.meta{font-size:11px;color:#64748b;text-align:center;margin-top:8px;min-height:14px}
+.panel{position:fixed;inset:0;background:#05040fe8;display:none;align-items:center;justify-content:center;padding:24px;z-index:9}
+.panel.show{display:flex}
+.card{max-width:420px;width:100%;background:#12103a;border:1px solid #ffffff1c;border-radius:18px;padding:22px}
+.card h2{margin:0 0 8px;font-size:18px}.card p{color:var(--mut);font-size:14px;line-height:1.45}
+.card input{width:100%;font-size:26px;letter-spacing:.35em;text-align:center;padding:12px;border-radius:12px;border:1px solid #ffffff30;background:#0b0a24;color:var(--fg)}
+.card button{margin-top:14px;width:100%;padding:13px;border-radius:12px;border:0;font-size:16px;font-weight:600;color:#fff;background:linear-gradient(90deg,var(--v),var(--b),var(--t))}
+.err{color:#fca5a5;font-size:13px;min-height:18px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <a href="/m" aria-label="Zurück">‹</a>
+    <h1>NEXUS LIVE TALK</h1>
+    <div class="pill" id="pill"><span class="dot"></span><span id="pilltxt">Bereit</span></div>
+  </header>
+  <div class="stage">
+    <canvas id="orb" aria-label="Voice Orb – tippen zum Unterbrechen"></canvas>
+    <div class="agent" id="agent">NEXUS</div>
+    <div class="statetxt" id="statetxt">Tippe auf Start und sprich einfach los.</div>
+  </div>
+  <div class="subs"><div class="you" id="you"></div><div class="ai" id="ai"></div></div>
+  <div class="controls">
+    <button class="btn" id="mute" title="Mikrofon stumm">🎙</button>
+    <button class="btn main" id="main" title="Start/Stopp">▶</button>
+    <button class="btn" id="barge" title="Unterbrechen per Stimme an/aus">✋</button>
+  </div>
+  <div class="meta" id="meta"></div>
+</div>
+<div class="panel" id="pair"><div class="card">
+  <h2>Handy mit NEXUS koppeln</h2>
+  <p>Am PC <b>livetalk_pair.ps1</b> starten (oder im Projektordner <code>python -m nexus.livetalk.auth pair</code>). Den 6-stelligen Code hier eingeben. Der Code gilt 3 Minuten.</p>
+  <input id="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000">
+  <button id="pairbtn">Koppeln</button>
+  <div class="err" id="pairerr"></div>
+</div></div>
+<script>
+(()=>{
+'use strict';
+const $=id=>document.getElementById(id);
+const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+const S={running:false,ws:null,ctx:null,node:null,stream:null,muted:false,voiceBarge:LS.get('lt_barge')!=='0',
+  state:'idle',turn:0,dropTurn:0,seq:0,retry:0,authed:false,needAuth:false,conv:LS.get('lt_conv')||'',
+  sources:[],nextTime:0,ended:{},micLevel:0,outLevel:0,analyser:null,outGain:null,wake:null,lastPing:0,
+  aiText:'',spokenText:'',reconnectTimer:null};
+const pill=(cls,txt)=>{$('pill').className='pill '+cls;$('pilltxt').textContent=txt};
+const STATE_TXT={idle:'Pausiert',loading:'Lade Stimme und Spracherkennung …',listening:'Ich höre zu …',thinking:'Denke nach …',speaking:'Spreche – einfach reinreden zum Unterbrechen'};
+function setState(s){S.state=s;$('statetxt').textContent=STATE_TXT[s]||s}
+$('barge').classList.toggle('off',!S.voiceBarge);
+
+// ---------------------------------------------------------------- Audio
+const WORKLET=`class Cap extends AudioWorkletProcessor{constructor(){super();this.r=sampleRate/16000;this.L=Math.max(1,Math.round(this.r));this.h=new Float32Array(this.L);this.hi=0;this.hs=0;
+this.t=0;this.prev=0;this.buf=new Int16Array(512);this.n=0;this.c=0}
+emit(y){const v=Math.max(-1,Math.min(1,y));this.buf[this.n++]=v<0?v*32768:v*32767;if(this.n===512){this.port.postMessage(this.buf.buffer,[this.buf.buffer]);this.buf=new Int16Array(512);this.n=0}}
+process(inp){const ch=inp[0]&&inp[0][0];if(!ch)return true;let s2=0;
+for(let i=0;i<ch.length;i++){let x=ch[i];s2+=x*x;
+ if(this.L>1){this.hs+=x-this.h[this.hi];this.h[this.hi]=x;this.hi=(this.hi+1)%this.L;x=this.hs/this.L}
+ while(this.t<=1){this.emit(this.prev+(x-this.prev)*this.t);this.t+=this.r}this.t-=1;this.prev=x}
+if(++this.c%4===0)this.port.postMessage({lv:Math.sqrt(s2/ch.length)});return true}}registerProcessor('nx-cap',Cap);`;
+async function startAudio(){
+  if(!window.isSecureContext||!navigator.mediaDevices){throw new Error('INSECURE')}
+  S.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1,sampleRate:16000}});
+  const AC=window.AudioContext||window.webkitAudioContext;
+  try{S.ctx=new AC({latencyHint:'interactive',sampleRate:16000})}catch(e){S.ctx=new AC({latencyHint:'interactive'})}
+  await S.ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET],{type:'application/javascript'})));
+  const src=S.ctx.createMediaStreamSource(S.stream);
+  S.node=new AudioWorkletNode(S.ctx,'nx-cap');
+  S.node.port.onmessage=e=>{const d=e.data;if(d&&d.lv!==undefined){S.micLevel=S.micLevel*.6+Math.min(1,d.lv*6)*.4;return}sendPcm(d)};
+  const sink=S.ctx.createGain();sink.gain.value=0;src.connect(S.node);S.node.connect(sink);sink.connect(S.ctx.destination);
+  S.analyser=S.ctx.createAnalyser();S.analyser.fftSize=512;S.outGain=S.ctx.createGain();S.outGain.connect(S.analyser);S.analyser.connect(S.ctx.destination);
+  if(S.ctx.state!=='running')await S.ctx.resume();
+}
+function stopAudio(){try{S.stream&&S.stream.getTracks().forEach(t=>t.stop())}catch(e){}try{S.ctx&&S.ctx.close()}catch(e){}S.ctx=S.node=S.stream=S.analyser=null;S.sources=[]}
+function sendPcm(buf){
+  if(!S.ws||S.ws.readyState!==1||!S.authed||S.muted)return;
+  if(!S.voiceBarge&&(S.state==='speaking'))return; // Halbduplex, wenn Unterbrechen per Stimme aus
+  const out=new Uint8Array(4+buf.byteLength);new DataView(out.buffer).setUint32(0,(S.seq++)>>>0);out.set(new Uint8Array(buf),4);
+  if(S.ws.bufferedAmount<256000)S.ws.send(out.buffer);
+}
+function playChunk(turn,idx,sr,pcm,newSentence){
+  if(!S.ctx||turn<=S.dropTurn)return;
+  const n=pcm.length/2;const dv=new DataView(pcm.buffer,pcm.byteOffset,pcm.byteLength);
+  const ab=S.ctx.createBuffer(1,n,sr);const ch=ab.getChannelData(0);for(let i=0;i<n;i++)ch[i]=dv.getInt16(i*2,true)/32768;
+  const src=S.ctx.createBufferSource();src.buffer=ab;src.connect(S.outGain);
+  const now=S.ctx.currentTime;let t=Math.max(now+0.04,S.nextTime);if(newSentence&&S.nextTime>now&&idx>0)t+=0.09;
+  src.start(t);S.nextTime=t+ab.duration;src._turn=turn;S.sources.push(src);
+  src.onended=()=>{S.sources=S.sources.filter(x=>x!==src);checkEnded(turn)};
+}
+function checkEnded(turn){if(S.ended[turn]&&!S.sources.some(s=>s._turn===turn)){send({type:'playback',state:'ended',turn});delete S.ended[turn]}}
+function stopPlayback(turn){S.dropTurn=Math.max(S.dropTurn,turn||S.turn);S.sources.forEach(s=>{try{s.stop()}catch(e){}});S.sources=[];S.nextTime=0}
+
+// ---------------------------------------------------------------- WebSocket
+function send(o){if(S.ws&&S.ws.readyState===1)S.ws.send(JSON.stringify(o))}
+function connect(){
+  clearTimeout(S.reconnectTimer);
+  const url=(location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws/livetalk';
+  pill('warn',S.retry?'Verbinde neu …':'Verbinde …');
+  const ws=new WebSocket(url);ws.binaryType='arraybuffer';S.ws=ws;S.authed=false;
+  ws.onmessage=ev=>{if(typeof ev.data!=='string'){onBinary(ev.data);return}let m;try{m=JSON.parse(ev.data)}catch(e){return}onMsg(m)};
+  ws.onclose=ev=>{if(S.ws!==ws)return;S.authed=false;stopPlayback();
+    if(ev.code===4401){pill('err','Nicht gekoppelt');showPair();return}
+    if(S.running){S.retry++;const d=Math.min(8000,400*Math.pow(2,Math.min(S.retry,5)));pill('err','Getrennt – neuer Versuch …');S.reconnectTimer=setTimeout(connect,d)}else pill('','Getrennt')};
+  ws.onerror=()=>{};
+}
+function onMsg(m){
+  switch(m.type){
+  case 'hello': S.needAuth=!!m.auth_required;const tok=LS.get('lt_token');
+    if(S.needAuth&&!tok){showPair();return}
+    const fromPhone=!!(window.NexusLiveTalk||window.NexusPhone||/Android|Mobile/i.test(navigator.userAgent||''));send({type:'start',token:tok||undefined,conversation_id:S.conv||undefined,client:'nexus-mobile-web',source:fromPhone?'phone':'web'});break;
+  case 'ready': S.authed=true;S.retry=0;S.conv=m.conversation_id;LS.set('lt_conv',S.conv);pill('ok','Verbunden');
+    $('meta').textContent=`Stimme ${m.voice} · STT ${m.stt}`+(m.turns?` · Kontext: ${m.turns} Züge`:'');break;
+  case 'loaded': break;
+  case 'state': if(m.state==='thinking'&&m.turn>S.turn){S.turn=m.turn}setState(m.state);break;
+  case 'vad': if(S.state==='listening')$('statetxt').textContent='Ich höre …';break;
+  case 'transcript': if(m.turn>=S.turn){S.turn=m.turn;$('you').innerHTML=m.text?'<b>Du:</b> '+esc(m.text):'';if(m.text){S.aiText='';S.spokenText='';renderAi()}}break;
+  case 'agent': $('agent').textContent=m.agent+(m.mode==='order'?' — Auftrag':m.mode==='action'?' — Aktion':m.mode==='phone'?' — Handy':m.mode==='weather'?' — Wetter':m.mode==='pc'?' — PC':m.mode==='clarify'?' — Rueckfrage':m.mode==='web'?' — Suche':m.mode==='announce'?' — Hinweis':'');break;
+  case 'token': if(m.turn===S.turn&&m.turn>S.dropTurn){S.aiText+=m.text;renderAi()}break;
+  case 'tts_chunk': S.pendingMeta={turn:m.turn,index:m.index,sr:m.sr,text:m.text};if(m.text&&m.turn===S.turn){S.spokenText+=(S.spokenText?' ':'')+m.text;renderAi()}break;
+  case 'tts_end': if(m.turn===S.turn&&!m.interrupted&&m.text){S.aiText=m.text;S.spokenText=m.text;renderAi()}S.ended[m.turn]=true;checkEnded(m.turn);break;
+  case 'barge_in': stopPlayback(m.turn);setState('listening');break;
+  case 'metrics': if(m.first_audio_ms!=null)$('meta').textContent=`Antwort nach ${(m.first_audio_ms/1000).toFixed(1)} s (+${m.endpoint_ms} ms Pause-Erkennung) · STT ${m.stt_ms} ms · ${m.agent||''}`;break;
+  case 'error': if(m.error==='AUTH_REQUIRED'){LS.set('lt_token','');showPair()}else{$('meta').textContent='Fehler: '+(m.detail||m.error)}break;
+  case 'pong': break;
+  case 'phone_cmd': handlePhoneCmd(m); break;
+  }
+}
+function phoneBridge(){return window.NexusLiveTalk||window.NexusPhone||null}
+async function handlePhoneCmd(m){
+  const br=phoneBridge();
+  const cmd=m.cmd||m.command;
+  const reply=(ok, extra)=>send(Object.assign({type:'phone_result',cmd:cmd,ok:!!ok}, extra||{}));
+  if(!br){reply(false,{error:'no_bridge'});return}
+  try{
+    if(cmd==='get_notifications' && typeof br.getNotifications==='function'){
+      const list=await br.getNotifications();
+      reply(true,{notifications:list||[]});return}
+    if(cmd==='prepare_reply' && typeof br.prepareReply==='function'){
+      const r=await br.prepareReply(m.id, m.text);reply(true,{result:r,spoken:(r&&r.spoken)||''});return}
+    if(cmd==='confirm_send' && typeof br.confirmSend==='function'){
+      const r=await br.confirmSend();reply(true,{result:r});return}
+    if((cmd==='cancel_reply'||cmd==='cancel_send') && typeof br.cancelReply==='function'){
+      const r=await br.cancelReply();reply(true,{result:r});return}
+    if(cmd==='send_file_to_phone' && typeof br.saveIncomingFile==='function'){
+      const r=await br.saveIncomingFile(m.name);reply(true,{result:r,name:m.name});return}
+    if(cmd==='prepare_share' && typeof br.prepareShareToContact==='function'){
+      const r=await br.prepareShareToContact(m.name);reply(true,{result:r,spoken:(r&&r.spoken)||''});return}
+    if(cmd==='confirm_share' && typeof br.confirmShareToContact==='function'){
+      const r=await br.confirmShareToContact();reply(true,{result:r});return}
+    reply(false,{error:'unknown_cmd'});
+  }catch(e){reply(false,{error:String(e&&e.message||e)})}
+}
+window.addEventListener('nexus_phone',ev=>{
+  const d=(ev&&ev.detail)||{};
+  if(!d||!d.type)return;
+  send(d);
+});
+function onBinary(buf){const u=new Uint8Array(buf);if(u[0]!==65)return;const dv=new DataView(buf);const turn=dv.getUint32(1),idx=dv.getUint32(5),sr=dv.getUint32(9);
+  const pm=S.pendingMeta;playChunk(turn,idx,sr,new Uint8Array(buf,13),!!(pm&&pm.turn===turn&&pm.index===idx&&pm.text))}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function renderAi(){const full=S.aiText.trim(),sp=S.spokenText.trim();
+  if(sp&&full.startsWith(sp)){$('ai').innerHTML=esc(sp)+'<span class="rest">'+esc(full.slice(sp.length))+'</span>'}else $('ai').textContent=full||sp}
+
+// ---------------------------------------------------------------- Pairing
+function showPair(){$('pair').classList.add('show');setTimeout(()=>$('code').focus(),50)}
+$('pairbtn').onclick=async()=>{$('pairerr').textContent='';try{
+  const r=await fetch('/api/livetalk/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:$('code').value.trim(),label:navigator.userAgent.slice(0,40)})});
+  const j=await r.json();if(!j.success)throw new Error(j.error||('HTTP '+r.status));LS.set('lt_token',j.token);$('pair').classList.remove('show');if(S.running)connect();else start()
+ }catch(e){$('pairerr').textContent='Koppeln fehlgeschlagen: '+e.message}};
+
+// ---------------------------------------------------------------- Steuerung
+async function start(){
+  if(S.running)return;
+  try{await startAudio()}catch(e){
+    $('statetxt').textContent=e.message==='INSECURE'?'Mikrofon braucht HTTPS: https://'+location.hostname+':8443/m/livetalk öffnen.':'Kein Mikrofon: '+e.message;return}
+  S.running=true;$('main').classList.add('on');$('main').textContent='■';
+  try{S.wake=await navigator.wakeLock.request('screen')}catch(e){}
+  connect();
+}
+function stop(){S.running=false;send({type:'stop'});try{S.ws&&S.ws.close()}catch(e){}S.ws=null;stopAudio();setState('idle');
+  $('main').classList.remove('on');$('main').textContent='▶';pill('','Pausiert');try{S.wake&&S.wake.release()}catch(e){}S.wake=null}
+$('main').onclick=()=>S.running?stop():start();
+$('mute').onclick=()=>{S.muted=!S.muted;$('mute').classList.toggle('off',S.muted);$('mute').textContent=S.muted?'🔇':'🎙'};
+$('barge').onclick=()=>{S.voiceBarge=!S.voiceBarge;LS.set('lt_barge',S.voiceBarge?'1':'0');$('barge').classList.toggle('off',!S.voiceBarge)};
+$('orb').onclick=()=>{if(!S.running){start();return}if(S.state==='speaking'||S.state==='thinking'){stopPlayback(S.turn);send({type:'barge_in'});setState('listening')}};
+document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&S.running){try{S.wake=await navigator.wakeLock.request('screen')}catch(e){}if(S.ctx&&S.ctx.state!=='running')S.ctx.resume();if(!S.ws||S.ws.readyState>1)connect()}});
+setInterval(()=>{if(S.ws&&S.ws.readyState===1)send({type:'ping',ts:Date.now()})},15000);
+
+// ---------------------------------------------------------------- Voice Orb
+const cv=$('orb'),g=cv.getContext('2d');let W=0,H=0,DPR=1;
+function fit(){DPR=Math.min(2,window.devicePixelRatio||1);const r=cv.getBoundingClientRect();W=cv.width=r.width*DPR;H=cv.height=r.height*DPR}
+window.addEventListener('resize',fit);fit();
+const td=new Uint8Array(256);let sm={lv:0,hue:0,rot:0,mix:[0,0,0,0]},rings=[];
+const PAL={idle:['#3b2d7a','#1e3a8a','#134e4a'],loading:['#6d28d9','#1d4ed8','#0f766e'],listening:['#2dd4bf','#3b82f6','#8b5cf6'],thinking:['#8b5cf6','#6366f1','#3b82f6'],speaking:['#60a5fa','#8b5cf6','#2dd4bf']};
+function lvl(){if(S.state==='speaking'&&S.analyser){S.analyser.getByteTimeDomainData(td);let s=0;for(let i=0;i<td.length;i++){const x=(td[i]-128)/128;s+=x*x}S.outLevel=S.outLevel*.5+Math.min(1,Math.sqrt(s/td.length)*5)*.5;return S.outLevel}
+  return S.state==='listening'?S.micLevel:0}
+function frame(ts){
+  const t=ts/1000,cx=W/2,cy=H/2,R=Math.min(W,H)*0.27;const st=S.state;const p=PAL[st]||PAL.idle;
+  const target=lvl();sm.lv+= (target-sm.lv)*0.25;
+  g.clearRect(0,0,W,H);
+  // Aura
+  const breathe=st==='idle'?0.04*Math.sin(t*1.2):0;
+  const aura=g.createRadialGradient(cx,cy,R*0.6,cx,cy,R*2.1);aura.addColorStop(0,p[1]+'55');aura.addColorStop(0.5,p[2]+'22');aura.addColorStop(1,'#00000000');
+  g.fillStyle=aura;g.beginPath();g.arc(cx,cy,R*2.1,0,7);g.fill();
+  // Ringe beim Zuhören
+  if(st==='listening'&&sm.lv>0.12&&(!rings.length||t-rings[rings.length-1].t>0.18))rings.push({t,a:Math.min(1,sm.lv*1.4)});
+  rings=rings.filter(r=>t-r.t<1.6);rings.forEach(r=>{const k=(t-r.t)/1.6;g.strokeStyle=`rgba(45,212,191,${(1-k)*0.5*r.a})`;g.lineWidth=2*DPR;g.beginPath();g.arc(cx,cy,R*(1.05+k*0.8),0,7);g.stroke()});
+  // Blob
+  const N=120,amp=st==='speaking'?0.05+sm.lv*0.22:st==='listening'?0.03+sm.lv*0.16:st==='thinking'?0.05:0.02;
+  const spd=st==='thinking'?2.4:st==='speaking'?3.2:1.2;sm.rot+=st==='thinking'?0.03:0.004;
+  g.save();g.translate(cx,cy);g.rotate(sm.rot);g.beginPath();
+  for(let i=0;i<=N;i++){const a=i/N*Math.PI*2;const d=Math.sin(a*3+t*spd)*0.5+Math.sin(a*5-t*spd*1.3+1.7)*0.3+Math.sin(a*2+t*spd*0.7+0.5)*0.2;
+    const r=R*(1+breathe+amp*d+(st==='speaking'?sm.lv*0.12:0));const x=Math.cos(a)*r,y=Math.sin(a)*r;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.closePath();
+  const fill=g.createRadialGradient(-R*0.3,-R*0.35,R*0.1,0,0,R*1.25);fill.addColorStop(0,'#ffffffcc');fill.addColorStop(0.18,p[0]);fill.addColorStop(0.62,p[1]);fill.addColorStop(1,p[2]);
+  g.shadowColor=p[0];g.shadowBlur=(30+sm.lv*60)*DPR;g.fillStyle=fill;g.fill();g.restore();
+  // Innenleben: Denkpunkte / Sprachwellen
+  g.shadowBlur=0;
+  if(st==='thinking'){for(let k=0;k<3;k++){const a=t*2.6+k*2.094;g.fillStyle='#e9d5ff';g.globalAlpha=0.85;g.beginPath();g.arc(cx+Math.cos(a)*R*0.55,cy+Math.sin(a)*R*0.55,R*0.07,0,7);g.fill()}g.globalAlpha=1}
+  if(st==='speaking'){g.strokeStyle='#ffffffb0';g.lineWidth=2.2*DPR;g.beginPath();for(let i=0;i<=60;i++){const x=cx-R*0.6+i/60*R*1.2;const env=Math.sin(i/60*Math.PI);const y=cy+Math.sin(i*0.55+t*14)*R*0.22*sm.lv*env+Math.sin(i*0.23-t*9)*R*0.06*env;i?g.lineTo(x,y):g.moveTo(x,y)}g.stroke()}
+  if(st==='listening'){g.fillStyle='#ffffffd0';const bars=5;for(let k=0;k<bars;k++){const h=R*(0.08+sm.lv*0.5*(0.6+0.4*Math.sin(t*9+k*1.3)));g.fillRect(cx-R*0.3+k*R*0.15-R*0.035,cy-h/2,R*0.07,h)}}
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+if(!window.isSecureContext&&location.hostname!=='127.0.0.1'&&location.hostname!=='localhost'){
+  $('statetxt').innerHTML='Für das Mikrofon bitte <a style="color:#2dd4bf" href="https://'+location.hostname+':8443/m/livetalk">die HTTPS-Seite</a> öffnen.'}
+window.NXLT=S; // Diagnose
+})();
+</script>
+</body>
+</html>

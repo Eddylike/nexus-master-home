@@ -193,12 +193,24 @@ def _model_size_map(client: Any) -> dict[str, int]:
     return sizes
 
 
+_NON_CHAT_MARKERS = ("llava", "bakllava", "moondream", "embed", "nomic-bert", "bge-", "minilm", "rerank")
+
+
+def _is_chat_model(name: str) -> bool:
+    """THINK-06/MH4D 2026-11-10: Embedding-/Vision-Modelle nie als Chat-Fallback waehlen."""
+    low = str(name or "").lower()
+    return not any(m in low for m in _NON_CHAT_MARKERS)
+
+
 def lightest_present(client: Any) -> str | None:
     """Smallest already-installed model by size; never pulls."""
     sizes = _model_size_map(client)
     if not sizes:
         return None
     named = list(sizes.items())
+    _chat = [(n, sz) for n, sz in named if _is_chat_model(n)]
+    if _chat:
+        named = _chat
     if all(sz == 0 for _, sz in named):
         chatish = [
             n for n, _ in named
@@ -230,6 +242,8 @@ def is_memory_pressure_error(err: str | None) -> bool:
         "failed to allocate",
         "memory pressure",
         "vram",
+        "requires more system memory",
+        "than is available",
     )
     return any(k in low for k in keys)
 
@@ -325,9 +339,10 @@ def resolve_fallback_model(client: Any, failed_model: str | None = None) -> str 
         others = [n for n in sizes if n != failed_model]
         if not others:
             return None
-        visionish = ("llava", "bakllava", "moondream")
-        chatish = [n for n in others if not any(v in n.lower() for v in visionish)]
-        pool = chatish or others
+        chatish = [n for n in others if _is_chat_model(n)]
+        if not chatish:
+            return None
+        pool = chatish
         if all((sizes.get(n) or 0) == 0 for n in pool):
             return sorted(pool)[0]
         return sorted(pool, key=lambda n: (sizes.get(n) or 0, n))[0]

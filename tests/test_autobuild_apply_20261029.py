@@ -34,7 +34,7 @@ def test_tolerant_match_reindents(sb):
 def test_tolerant_match_requires_unique(sb):
     _, target, rel = sb
     target.write_text("def f():\n    pass\ndef g():\n    pass\n", encoding="utf-8")
-    with pytest.raises(ValueError, match="FIND_MATCHES"):
+    with pytest.raises(loop.AnchorMissing, match="PATCH_ANCHOR_AMBIGUOUS"):
         loop._compute_edits([{"file": rel, "find": "  pass", "replace": "return 1"}])
 
 

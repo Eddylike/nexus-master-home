@@ -8,7 +8,7 @@ def test_leitbild_text():
 def test_download_guard():
     assert check_download_url("https://example.org/film.mp4") == {"ok": True, "warnings": []}
     assert not check_download_url("file:///C:/x.exe")["ok"]
-    w = check_download_url("http://192.0.2.13/setup.exe")["warnings"]
+    w = check_download_url("http://192.168.1.5/setup.exe")["warnings"]
     assert any("IP" in x for x in w) and any(".exe" in x for x in w)
     assert check_download_url("https://bit.ly/abc")["warnings"]
     assert check_download_url("https://xn--pypal-4ve.com/")["warnings"]

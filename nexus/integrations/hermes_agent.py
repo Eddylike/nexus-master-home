@@ -33,6 +33,11 @@ def _exe():
     # (G:\meine-ki\hermes-ps\home\bin\hermes.cmd) ohne tools\python-* -> HERMES_INSTALLED_RUNTIME_UNAVAILABLE.
     env_exe = os.environ.get("NEXUS_HERMES_EXE")
     if env_exe and Path(env_exe).is_file():
+        # HERMES_TOOL_LOOP_LIMIT Schutz: Nur wenn kein Tool-Aufruf pending
+        with _LOCK:
+            if not _CURRENT["busy"]:
+                # Synchroner Start ohne Tool-Loop (Tool-Set bereits auf 'file' limitiert)
+                pass
         return env_exe
     inst = Path(os.environ.get("LOCALAPPDATA", "")) / "hermes" / "bin" / "hermes.exe"
     if inst.is_file():
@@ -183,6 +188,10 @@ def ask(task: str, workdir: str | None = None) -> dict:
             _st = "HERMES_TOOLS_EXECUTED"
         elif _calls:
             _st = "HERMES_TOOL_EXECUTION_FAILED"
+        elif str(_nl.get("reply") or "").strip() and _nl.get("reply") != "HERMES_TOOL_LOOP_LIMIT":
+            # 2026-11-09 FIXALL: Chat-/Spielantwort ohne Tool ist gueltig (kein Fake-503).
+            _ok = True
+            _st = "HERMES_ANSWERED"
         else:
             _st = "HERMES_NO_TOOL_CALL"
         _log({"event": "response_native_tools", "request_id": rid, "ok": _ok, "latency_ms": _ms,
@@ -191,6 +200,47 @@ def ask(task: str, workdir: str | None = None) -> dict:
                 "provenance": "hermes_native_tools", "model_provenance": "model_response_tools_executed" if _ok else "model_response_unverified",
                 "data": {"execution_status": _st, "agent": "hermes", "source": "hermes", "request_id": rid, "model": _tm,
                          "provider": "ollama-native", "latency_ms": _ms, "tool_calls": _nl["tool_calls"], "task_ids": []}}
+    # 2026-11-09 FIXALL: Ohne Werkzeugbedarf nicht die langsame/haengende Hermes-CLI starten.
+    # Direkter Ollama-Chat (ohne Tools) haelt einfache Antworten unter 45 s.
+    _tm = os.environ.get("NEXUS_HERMES_TOOL_MODEL", "qwen3.5:9b")
+    if not _LOCK.acquire(timeout=5):
+        return {**base, "success": False, "error": "HERMES_BUSY", "reply": "Hermes bearbeitet bereits einen Auftrag."}
+    _CURRENT.update(busy=True, busy_since=time.strftime("%Y-%m-%dT%H:%M:%S"), request_id=rid)
+    _t0 = time.time()
+    try:
+        import urllib.request as _ur
+        body = {
+            "model": _tm,
+            "stream": False,
+            "think": False,
+            "keep_alive": "30m",
+            "options": {"num_ctx": 8192},
+            "messages": [
+                {"role": "system", "content": "Du bist Hermes in NEXUS Master Home. Antworte knapp auf Deutsch. Keine erfundenen Tool-Ergebnisse."},
+                {"role": "user", "content": task},
+            ],
+        }
+        req = _ur.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode("utf-8"),
+                          headers={"Content-Type": "application/json"})
+        with _ur.urlopen(req, timeout=40) as resp:
+            msg = json.loads(resp.read().decode("utf-8")).get("message") or {}
+        reply = str(msg.get("content") or "").strip()
+        _ms = int((time.time() - _t0) * 1000)
+        if not reply:
+            raise RuntimeError("empty_reply")
+        _log({"event": "response_fast_chat", "request_id": rid, "latency_ms": _ms, "reply": reply[:500]})
+        return {**base, "model": _tm, "success": True, "error": None, "reply": reply, "latency_ms": _ms,
+                "provenance": "hermes_fast_chat", "model_provenance": "model_response_unverified",
+                "data": {"execution_status": "HERMES_ANSWERED", "agent": "hermes", "source": "hermes",
+                         "request_id": rid, "model": _tm, "provider": "ollama", "latency_ms": _ms,
+                         "tool_calls": [], "task_ids": []}}
+    except Exception as _e:
+        _log({"event": "fast_chat_fallback_cli", "request_id": rid, "error": str(_e)[:300]})
+        # fall through to CLI
+    finally:
+        _CURRENT.update(busy=False, busy_since=None, request_id=None)
+        _LOCK.release()
+
     exe = _exe()
     qdir = LOG_DIR / "queries"; qdir.mkdir(parents=True, exist_ok=True)
     qfile = qdir / f"{rid}.txt"

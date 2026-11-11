@@ -23,7 +23,7 @@ info:
     name: NEXUS / WoZiPC
 
 servers:
-  - url: "https://wozipc-nexus.tailaf0b38.ts.net"
+  - url: "https://wozipc-nexus.example.ts.net"
     description: >
       Public HTTPS via Tailscale Funnel (free).
       Funnel targets Allowlist Gateway 127.0.0.1:8300 (NOT raw :8299).
@@ -491,8 +491,6 @@ components:
           description: |
             Task-specific parameters. Examples:
             ping.echo, read_file.path, write_file.path+content, list_files.path,
-            termux_phase_a_control.action (required allowlisted Phase-A action: health, chat_e2e, shared_room_e2e, voice_status, files_e2e, memory_e2e, wozipc_probe, device_control, quick_actions, agents_skills, autostart_ensure, file_status, status_nexus, autostart_status; phone path = Phase-A 8766 via adb forward tcp:18766, legacy 8765 agent retired),
-            android_push_file.source+destination+overwrite+device (source is a relative path strictly under workspace/NEXUS_ANDROID_FINAL; absolute/traversal/symlink sources blocked),
             patch_file.path+old_text+new_text (canonical; legacy find/replace normalized internally), move_file/copy_file src+dst,
             powershell_registered_action.action (required registered action name; no free command),
             delete_file.path+confirm, git_*, python_run_project_script, etc.

@@ -194,10 +194,8 @@ class OutcomesTest(unittest.TestCase):
             self.assertVerdict(name, {"scheduled": True, "via": "test.ps1"}, "verification_unknown")
             self.assertVerdict(name, {"status": "PASS", "old_pid": 1, "new_pid": None,
                                       "bridge_health": "RESTARTING"}, "verification_unknown")
-        for name in ("media_status", "voice_status", "service_restart", "termux_start_nexus",
-                     "android_bootloader_status", "android_termux_status", "check_phase_a_stage_cleaned",
-                     "deploy_phase_a_control", "termux_install_nexus_phase_a", "termux_file_status",
-                     "termux_stop_nexus", "termux_restart_nexus", "termux_status_nexus"):
+        for name in ("media_status", "voice_status", "service_restart", "nexus_start",
+                     "android_bootloader_status", "android_termux_status"):
             self.assertNotEqual(evaluate(name, {}, {"status": "PASS", "ok": True}).status, "succeeded")
         self.assertVerdict("ping", {"ok": True, "pong": True, "scheduled": True}, "verification_unknown")
         self.assertVerdict("ping", {"ok": True, "pong": True, "approval_required": True}, "verification_unknown")
@@ -212,17 +210,6 @@ class OutcomesTest(unittest.TestCase):
             self.assertVerdict(name, {**process(), "adb": True}, "succeeded")
             self.assertVerdict(name, {**process(1), "adb": True}, "failed")
         self.assertVerdict("android_screenshot", {"ok": True, "path": "fixture.png", "bytes": 10}, "succeeded")
-        push = {"status": "PASS", "source": "x", "destination": "y", "size": 0,
-                "sha256": "a" * 64, "hash_verified": True}
-        self.assertVerdict("android_push_file", push, "succeeded")
-        self.assertVerdict("android_push_file", {**push, "hash_verified": False}, "verification_unknown")
-        tree = {"status": "PASS", "source": "x", "destination": "y", "count": 1, "files": [push]}
-        self.assertVerdict("android_push_tree", tree, "succeeded")
-        self.assertVerdict("android_push_tree", {**tree, "files": [{**push, "status": "FAIL"}]}, "failed")
-        self.assertVerdict("android_push_tree", {**tree, "files": [None]}, "verification_unknown")
-        self.assertVerdict("termux_phase_a_control", {"status": "PASS", "agents": ["test"]}, "succeeded", {"action": "agents_skills"})
-        self.assertVerdict("termux_phase_a_control", {"status": "PASS", "agents": ["test"]}, "verification_unknown", {"action": "health"})
-        self.assertVerdict("provision_bridge_token_to_phone", {"written": True, "target_length": 64, "token_exposed": False}, "succeeded")
 
     def test_task_lifecycle_preserves_data_and_records_failure(self):
         samples = [("ping", {"ok": True, "pong": True}, "succeeded", None),

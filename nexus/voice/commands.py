@@ -380,7 +380,7 @@ def handle_command(body: dict[str, Any], engine) -> dict[str, Any]:
             _blk["stt"] = stt_info
             return _blk
     parsed = _pick([parse(x) for x in texts])
-    if parsed["intent"] == "chat" and body.get("llm_fallback", True) and KEYWORDS.search(parsed["text"] or ""):
+    if parsed["intent"] == "chat" and body.get("llm_fallback", True):
         lp = _llm_parse(parsed["text"], engine)
         if lp:
             parsed = lp

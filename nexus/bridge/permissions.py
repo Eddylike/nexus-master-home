@@ -46,7 +46,6 @@ TASK_PERMISSIONS: dict[str, PermissionLevel] = {
     "android_termux_status": PermissionLevel.READ_ONLY,
     "service_status": PermissionLevel.READ_ONLY,
     "nexus_control_status": PermissionLevel.READ_ONLY,
-    "check_phase_a_stage_cleaned": PermissionLevel.READ_ONLY,
     "hermes_check_code": PermissionLevel.READ_ONLY,
     # Creates only a pending local approval request; never approves or consumes it.
     "request_approval": PermissionLevel.READ_ONLY,
@@ -68,24 +67,12 @@ TASK_PERMISSIONS: dict[str, PermissionLevel] = {
     "python_run_project_script": PermissionLevel.SAFE_WRITE,
     "hermes_run_code_tests": PermissionLevel.SAFE_WRITE,
     "android_screenshot": PermissionLevel.SAFE_WRITE,
-    "android_push_file": PermissionLevel.SAFE_WRITE,
-    "android_push_tree": PermissionLevel.SAFE_WRITE,
-    "termux_install_nexus_phase_a": PermissionLevel.SAFE_WRITE,
-    "termux_file_status": PermissionLevel.READ_ONLY,
-    "termux_patch_nexus_start_agent": PermissionLevel.SAFE_WRITE,
-    "termux_start_nexus": PermissionLevel.SAFE_WRITE,
-    "termux_stop_nexus": PermissionLevel.SAFE_WRITE,
-    "termux_restart_nexus": PermissionLevel.SAFE_WRITE,
-    "termux_status_nexus": PermissionLevel.READ_ONLY,
-    "termux_phase_a_control": PermissionLevel.SAFE_WRITE,
     # PRIVILEGED (local approval_id required)
     "restart_nexus_bridge_exact": PermissionLevel.PRIVILEGED,
     # Fixed official Krita Portable installer; no arbitrary URL/path, local approval required.
     "install_krita_portable": PermissionLevel.PRIVILEGED,
     # Fixed local Krita GUI test launcher; exact G: executable only, approval required.
     "krita_gui_test": PermissionLevel.PRIVILEGED,
-    "deploy_phase_a_control": PermissionLevel.PRIVILEGED,
-    "provision_bridge_token_to_phone": PermissionLevel.PRIVILEGED,
     "powershell_registered_action": PermissionLevel.PRIVILEGED,
     "service_start": PermissionLevel.PRIVILEGED,
     "service_stop": PermissionLevel.PRIVILEGED,
@@ -100,6 +87,10 @@ TASK_PERMISSIONS: dict[str, PermissionLevel] = {
     "nexus_rollback_patch": PermissionLevel.PRIVILEGED,
     "git_push": PermissionLevel.PRIVILEGED,
     "android_install_apk": PermissionLevel.PRIVILEGED,
+    "android_push_file": PermissionLevel.PRIVILEGED,
+    "android_push_tree": PermissionLevel.PRIVILEGED,
+    "android_push_file": PermissionLevel.PRIVILEGED,
+    "android_push_tree": PermissionLevel.PRIVILEGED,
     # PC-Eingabesteuerung: echte Mausbewegung, daher PRIVILEGED (lokale Freigabe)
     "mouse_move": PermissionLevel.PRIVILEGED,
     # Phase 2 (02.11.2026): nur In-Process (Executor lehnt Bridge-Aufrufe ab)

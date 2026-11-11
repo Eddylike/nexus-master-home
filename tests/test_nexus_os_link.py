@@ -28,7 +28,7 @@ def g_tmp(monkeypatch):
 
 def test_network_filter():
     assert L.allowed("192.0.2.10", {})
-    assert L.allowed("192.0.2.10", {})
+    assert L.allowed("192.0.2.56", {})
     assert L.allowed("127.0.0.1", {})
     assert not L.allowed("8.8.8.8", {})
     assert not L.allowed("127.0.0.1", {"X-Forwarded-For": "1.2.3.4"})

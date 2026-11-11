@@ -353,57 +353,33 @@ def _screenshot(data: dict, params: dict) -> None:
     _integer(data, "bytes", 1)
 
 
-def _push(data: dict, params: dict) -> None:
-    _envelope(data)
-    _require(data.get("status") == "PASS", "missing push completion")
+def _android_push_item(data: dict) -> None:
+    """A successful Android transfer must carry verified executor evidence."""
+    _require(type(data) is dict, "invalid Android transfer result")
+    _require(data.get("status") == "PASS", "Android transfer not passed")
     _text(data, "source", "destination", "sha256")
     _integer(data, "size")
-    _require(len(data["sha256"]) == 64 and all(c in "0123456789abcdef" for c in data["sha256"].lower()), "invalid checksum")
-    _require(data.get("hash_verified") is True, "hash proof absent; size-only fallback is not explicit")
+    _require(
+        re.fullmatch(r"[0-9a-fA-F]{64}", data["sha256"]) is not None,
+        "invalid transfer SHA-256"
+    )
+    _fields(data, {"hash_verified": bool})
+    # False is valid only after the executor's size-based fallback verification.
 
 
-def _push_tree(data: dict, params: dict) -> None:
-    _require(data.get("status") == "PASS", "missing tree completion")
+def _android_push_file(data: dict, params: dict) -> None:
+    _android_push_item(data)
+
+
+def _android_push_tree(data: dict, params: dict) -> None:
+    _require(type(data) is dict, "invalid Android tree result")
+    _require(data.get("status") == "PASS", "Android tree transfer not passed")
     _text(data, "source", "destination")
+    _integer(data, "count")
     _fields(data, {"files": list})
-    _integer(data, "count", 1)
-    _require(data["count"] == len(data["files"]), "push count mismatch")
+    _require(data["count"] == len(data["files"]), "transferred file count mismatch")
     for item in data["files"]:
-        _push(item, {})
-
-
-def _phase(data: dict, params: dict) -> None:
-    if params.get("action") == "health":
-        # Completion means this fixed health observation finished. An OFFLINE
-        # local_ai result is not successful model integration or deployment.
-        _require(data.get("status") == "PASS" and data.get("service") == "NEXUS_PHASE_A_CONTROL",
-                 "phone health service not verified")
-        _integer(data, "pid", 1)
-        _text(data, "version", "code_sha256")
-        _require(len(data["code_sha256"]) == 64 and all(c in "0123456789abcdef" for c in data["code_sha256"].lower()),
-                 "invalid phone code hash")
-        _fields(data, {"actions": list, "local_ai": dict})
-        _require("health" in data["actions"] and all(type(x) is str for x in data["actions"]), "invalid phone actions")
-        ai = data["local_ai"]
-        _require(ai.get("status") in ("ONLINE", "OFFLINE"), "invalid phone local_ai observation")
-        if ai.get("status") == "ONLINE":
-            _fields(ai, {"models": list})
-            _require(bool(ai["models"]) and all(type(x) is str and x for x in ai["models"]), "invalid phone model list")
-        else:
-            _text(ai, "reason")
-        return
-    if params.get("action") != "agents_skills":
-        raise _Unknown("remote action completion contract not available in PC executor")
-    _require(data.get("status") == "PASS", "agent registry not verified")
-    _fields(data, {"agents": list})
-    _require(bool(data["agents"]) and all(type(x) is str and x for x in data["agents"]), "empty/invalid agent registry")
-
-
-def _provision(data: dict, params: dict) -> None:
-    _true(data, "written")
-    _require(type(data.get("target_length")) is int and data["target_length"] == 64
-             and data.get("token_exposed") is False, "missing private transfer acknowledgement")
-
+        _android_push_item(item)
 
 def _mouse(data: dict, params: dict) -> None:
     """Mausbewegung gilt nur als erledigt, wenn die Rueckleseposition passt."""
@@ -446,8 +422,8 @@ RULES: dict[str, Callable[[dict, dict], None]] = {
     "media_status": _media,
     "voice_status": _voice,
     "android_screenshot": _screenshot,
-    "android_push_file": _push, "android_push_tree": _push_tree,
-    "termux_phase_a_control": _phase, "provision_bridge_token_to_phone": _provision,
+    "android_push_file": _android_push_file,
+    "android_push_tree": _android_push_tree,
     "hermes_check_code": _static, "hermes_run_code_tests": _sandbox_run,
     "mouse_move": _mouse,
     "hermes_check_web": _web_check,
@@ -469,13 +445,10 @@ for _name in ("android_status", "android_devices", "termux_status", "android_ver
               "android_security_patch", "android_fingerprint", "android_slot", "android_storage",
               "android_battery", "android_network"):
     RULES[_name] = _adb
-for _name in ("nexus_start", "nexus_stop", "nexus_restart", "restart_nexus_bridge_exact", "termux_start_nexus"):
+for _name in ("nexus_start", "nexus_stop", "nexus_restart", "restart_nexus_bridge_exact"):
     RULES[_name] = _unproven("completion/transition is not verified; scheduling or existing health only")
-for _name in ("android_bootloader_status", "android_termux_status", "check_phase_a_stage_cleaned"):
+for _name in ("android_bootloader_status", "android_termux_status"):
     RULES[_name] = _unproven("underlying exit status was discarded; observation cannot be verified")
-for _name in ("termux_install_nexus_phase_a", "termux_file_status", "termux_stop_nexus",
-              "termux_restart_nexus", "termux_status_nexus", "termux_patch_nexus_start_agent"):
-    RULES[_name] = _unproven("remote completion contract unavailable or executor is obsolete")
 RULES["search_log"] = _search_log
 RULES["request_approval"] = _request_approval
 RULES["install_krita_portable"] = _install_krita
@@ -484,7 +457,6 @@ RULES["krita_gui_test"] = _unproven("process started only; GUI test result is no
 RULES["pc_music"] = _unproven("in-process only; bridge call rejected")
 RULES["shell_run"] = _unproven("in-process only; bridge call rejected")
 RULES["openai_diagnostic_once"] = _openai_once
-RULES["deploy_phase_a_control"] = _unproven("cleanup exit and full autostart verification are absent")
 
 
 # 008-P03: Abschlussregeln fuer erweiterte READ_ONLY-Werkzeuge

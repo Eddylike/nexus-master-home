@@ -47,6 +47,7 @@
     const data = result.data || {};
     const proven = ["persisted_bridge_tasks", "persisted_order_journals", "registry_and_receipts"].includes(data.provenance);
     box.append(element("strong", proven ? (data.execution_status || result.status || "Status unbekannt") : "Chatantwort · kein verifizierter Auftragsabschluss"));
+    if (result.error) box.append(element("p", result.error, "master-error"));
     box.append(element("p", result.reply || result.content || ""));
     if (result.error) box.append(element("p", result.error, "master-error"));
     if ((data.task_ids || []).length) box.append(element("p", "Werkzeugbelege: " + data.task_ids.join(", "), "master-mono"));

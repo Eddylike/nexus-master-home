@@ -985,3 +985,77 @@ body.nx-app.nx-reference [data-app="nexusall"] .nx-reference-app-name { font-siz
 
 /* Lokale KI fix 20261028: live telemetry pinned above the composer. */
 body.nx-app.nx-reference #nxChat > #nxGlassTelemetry { flex: 0 0 auto; position: relative; z-index: 3; margin: 0 auto 6px; background: rgba(236,244,255,.92); border-radius: 14px; padding: 4px; }
+
+/* 20261106 layout repair: keep the library tile separate from Studio and
+   let the Systemdetails panel use the viewport instead of the clipped header. */
+body.nx-app.nx-reference #nxGlassSystemControls { position: static !important; }
+body.nx-app.nx-reference #nxGlassSystemControls[open] > .nx-glass-system-controls {
+  position: fixed !important;
+  top: clamp(72px, 9vh, 150px) !important;
+  right: clamp(12px, 2vw, 42px) !important;
+  left: auto !important;
+  width: min(620px, calc(100vw - 32px)) !important;
+  max-width: calc(100vw - 32px) !important;
+  max-height: calc(100dvh - clamp(90px, 12vh, 170px)) !important;
+  overflow: auto !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-content: flex-start !important;
+  z-index: 10000 !important;
+  box-sizing: border-box !important;
+}
+body.nx-app.nx-reference #nxGlassSystemControls[open] #statusChips {
+  display: flex !important;
+  flex: 1 1 100% !important;
+  flex-wrap: wrap !important;
+  min-width: 0 !important;
+}
+body.nx-app.nx-reference #nxGlassSystemControls[open] #statusChips > * {
+  min-width: min(150px, 100%) !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+}
+@media (max-width: 800px) {
+  body.nx-app.nx-reference #nxGlassSystemControls[open] > .nx-glass-system-controls {
+    top: 58px !important;
+    right: 8px !important;
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - 72px) !important;
+  }
+}
+
+/* Views opened from the left navigation must sit above the decorative/live hub.
+   Raise the whole scaled application stacking context on compact layouts too. */
+body.nx-app.nx-reference #nxReferenceStage:has(#libraryPanel.show),
+body.nx-app.nx-reference #nxReferenceStage:has(#perfPanel.show),
+body.nx-app.nx-reference #nxReferenceStage:has(#nxGlassSystemControls[open]) {
+  z-index: 10040 !important;
+}
+body.nx-app.nx-reference #libraryPanel.show,
+body.nx-app.nx-reference #perfPanel.show {
+  position: fixed !important;
+  inset: clamp(64px, 8vh, 120px) clamp(12px, 4vw, 72px) clamp(72px, 9vh, 130px) !important;
+  width: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: auto !important;
+  z-index: 10050 !important;
+  box-sizing: border-box !important;
+  border: 1px solid #a7cee9 !important;
+  border-radius: 16px !important;
+  background: #f1f8fffa !important;
+  box-shadow: 0 16px 44px #173d6877 !important;
+}
+body.nx-app.nx-reference #libraryPanel.show > .body,
+body.nx-app.nx-reference #perfPanel.show > .body {
+  max-height: calc(100% - 58px) !important;
+  overflow: auto !important;
+}
+@media (max-width: 800px) {
+  body.nx-app.nx-reference #libraryPanel.show,
+  body.nx-app.nx-reference #perfPanel.show {
+    inset: 58px 8px 12px !important;
+    z-index: 10050 !important;
+  }
+}

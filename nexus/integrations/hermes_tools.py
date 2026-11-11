@@ -95,7 +95,26 @@ WANTS = re.compile(r"\b(read_file|write_file|list_directory|search_files|github|
 
 
 def wants_tools(task: str) -> bool:
-    return bool(task) and bool(WANTS.search(task))
+    """True nur bei echtem Werkzeugbedarf.
+
+    2026-11-09 FIXALL: Negationen (kein Tool / keine Datei / kein Shell) und reine
+    Antwortaufgaben duerfen den Native-Tool-Loop nicht ausloesen. Sonst antwortet
+    das Modell korrekt ohne Tool, und hermes_agent meldet fälschlich 503 HERMES_NO_TOOL_CALL.
+    """
+    if not task:
+        return False
+    cleaned = re.sub(
+        r"\bkein(?:e|en|em|er)?\s+(?:tools?|dateien?|shell|werkzeuge?)\b",
+        " ",
+        task,
+        flags=re.I,
+    )
+    cleaned = re.sub(r"\bohne\s+(?:tools?|dateien?|werkzeuge?)\b", " ", cleaned, flags=re.I)
+    # reine Kurzantwort / Rollenspiel-Chat ohne konkrete Datei-/Repo-Aktion
+    if re.search(r"\b(?:antworte|sage|sag)\b.{0,60}\b(?:wort|satz|ok)\b", cleaned, re.I):
+        if not re.search(r"\b(?:lies|lese|erstelle|schreibe|github|gh|repo|patch)\b", cleaned, re.I):
+            return False
+    return bool(WANTS.search(cleaned))
 
 
 def has_text_toolcall(reply: str) -> bool:

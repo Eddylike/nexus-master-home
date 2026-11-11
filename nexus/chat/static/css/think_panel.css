@@ -1,0 +1,42 @@
+/* THINK-05 2026-11-10: Denkprozess-Seitenleiste (rechts im Chat, unter dem Header). */
+html body#nxBody #nxChat{position:relative!important}
+html body#nxBody #nxThinkPanel{position:absolute;right:0;top:56px;bottom:0;width:40px;z-index:6;display:flex;flex-direction:column;
+  background:rgba(255,255,255,.58);border-left:1px solid rgba(255,255,255,.75);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  color:#12203a;font-size:12px;transition:width .2s ease}
+html body#nxBody.nx-think-on #nxThinkPanel{width:320px}
+html body#nxBody.nx-think-ready #nxChat#nxChat{padding-right:40px!important;box-sizing:border-box!important}
+html body#nxBody.nx-think-ready.nx-think-on #nxChat#nxChat{padding-right:320px!important}
+html body#nxBody.nx-think-ready #nxChat > #nxTop#nxTop{margin-right:-40px!important}
+html body#nxBody.nx-think-ready.nx-think-on #nxChat > #nxTop#nxTop{margin-right:-320px!important}
+html body#nxBody #nxThinkPanel .nx-think-head{flex:0 0 auto;padding:10px 8px;border-bottom:1px solid rgba(90,61,154,.16)}
+html body#nxBody #nxThinkToggle{display:flex;align-items:center;gap:8px;width:100%;height:30px;padding:0 8px;border-radius:8px;cursor:pointer;
+  background:rgba(255,255,255,.55);border:1px solid rgba(90,61,154,.22);color:#12203a;font:600 12px/1 inherit;white-space:nowrap;overflow:hidden}
+html body#nxBody #nxThinkToggle .nx-think-knob{flex:0 0 26px;width:26px;height:14px;border-radius:999px;background:rgba(18,32,58,.16);position:relative;transition:background .2s}
+html body#nxBody #nxThinkToggle .nx-think-knob::after{content:"";position:absolute;left:2px;top:2px;width:10px;height:10px;border-radius:50%;background:#3a4d6b;transition:transform .2s,background .2s}
+html body#nxBody #nxThinkToggle[aria-checked=true]{border-color:rgba(57,255,20,.55);color:#12203a}
+html body#nxBody #nxThinkToggle[aria-checked=true] .nx-think-knob{background:linear-gradient(90deg,#39FF14,#c9b4e8)}
+html body#nxBody #nxThinkToggle[aria-checked=true] .nx-think-knob::after{transform:translateX(12px);background:#fff}
+html body#nxBody #nxThinkToggle .nx-think-label{flex:1 1 auto;text-align:left;overflow:hidden;text-overflow:ellipsis;letter-spacing:.04em}
+html body#nxBody #nxThinkToggle .nx-think-state{flex:0 0 auto;font-size:10.5px;padding:1px 6px;border-radius:6px;border:1px solid rgba(90,61,154,.22);color:#3a4d6b}
+html body#nxBody #nxThinkToggle[aria-checked=true] .nx-think-state{color:#0A6B22;border-color:rgba(10,107,34,.45)}
+html body#nxBody:not(.nx-think-on) #nxThinkPanel .nx-think-head{padding:10px 4px}
+html body#nxBody:not(.nx-think-on) #nxThinkToggle{flex-direction:column;height:auto;padding:8px 0;gap:10px;justify-content:flex-start}
+html body#nxBody:not(.nx-think-on) #nxThinkToggle .nx-think-knob{transform:rotate(90deg);margin:6px 0}
+html body#nxBody:not(.nx-think-on) #nxThinkToggle .nx-think-label{writing-mode:vertical-rl;text-orientation:mixed;flex:0 0 auto}
+html body#nxBody:not(.nx-think-on) #nxThinkToggle .nx-think-state{writing-mode:vertical-rl;padding:6px 1px}
+html body#nxBody:not(.nx-think-on) #nxThinkPanel :is(.nx-think-body,.nx-think-meta){display:none}
+html body#nxBody #nxThinkPanel .nx-think-body{flex:1 1 auto;min-height:0;overflow:auto;padding:10px 12px}
+html body#nxBody #nxThinkPanel .nx-think-empty{margin:24px 0 0;text-align:center;color:#3a4d6b;font-style:italic}
+html body#nxBody #nxThinkPanel .nx-think-text{margin:0;white-space:pre-wrap;word-break:break-word;font:11.5px/1.55 ui-monospace,"Cascadia Mono",Consolas,monospace;color:#12203a}
+html body#nxBody #nxThinkPanel.is-live .nx-think-text{border-left:2px solid #39FF14;padding-left:8px}
+html body#nxBody #nxThinkPanel .nx-think-meta{flex:0 0 auto;padding:6px 12px;border-top:1px solid rgba(90,61,154,.16);color:#3a4d6b;font:10.5px ui-monospace,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody mark.nx-think-hl{background:rgba(201,180,232,.40);color:#3a1d7a;border-radius:3px;padding:0 2px}
+html body#nxBody #messages .nx-think-msg{margin:2px 0 8px;border:1px solid rgba(90,61,154,.28);border-radius:8px;background:rgba(201,180,232,.16)}
+html body#nxBody #messages .nx-think-msg>summary{cursor:pointer;padding:4px 10px;font-size:11px;color:#5A3D9A;list-style:none;user-select:none}
+html body#nxBody #messages .nx-think-msg>summary::before{content:"\25B8  "}
+html body#nxBody #messages .nx-think-msg[open]>summary::before{content:"\25BE  "}
+html body#nxBody #messages .nx-think-msg>pre{margin:0;padding:6px 10px 8px;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:11px/1.5 ui-monospace,Consolas,monospace;color:#12203a;border-top:1px solid rgba(90,61,154,.18)}
+@media (max-width:1500px){html body#nxBody.nx-think-on #nxThinkPanel{width:280px}
+  html body#nxBody.nx-think-ready.nx-think-on #nxChat#nxChat{padding-right:280px!important}
+  html body#nxBody.nx-think-ready.nx-think-on #nxChat > #nxTop#nxTop{margin-right:-280px!important}}
+@media (prefers-reduced-motion:reduce){html body#nxBody #nxThinkPanel,html body#nxBody #nxThinkToggle *{transition:none!important}}

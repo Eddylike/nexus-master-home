@@ -99,6 +99,8 @@ def t_list_files(path: str = ".", limit: int = 50) -> dict:
 
 def t_read_file(path: str, max_chars: int = 4000) -> dict:
     p = _safe_path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"FILE_NOT_FOUND: {path} - erst search_files/list_files nutzen")
     if p.stat().st_size > 2_000_000:
         raise ValueError("FILE_TOO_LARGE")
     return {"path": str(p), "content": redact(p.read_text(encoding="utf-8", errors="replace")[: min(int(max_chars), 8000)])}
@@ -615,7 +617,7 @@ class AgentSpec:
 
 TEMPLATES: dict[str, dict] = {
     "researcher": dict(name="researcher", role="Lokale Recherche: Gedaechtnis und NEXUS-Dateien durchsuchen, Quellen nennen.",
-                       system_prompt="Du bist researcher. Nutze nur deine Tools. Antworte auf Deutsch mit Quellen (Dateipfad oder Memory-ID) und Kurzfazit. Erfinde nichts; wenn nichts gefunden, sag das.",
+                       system_prompt="Du bist researcher. Nutze nur deine Tools. Antworte auf Deutsch mit Quellen (Dateipfad oder Memory-ID) und Kurzfazit. Erfinde nichts; wenn nichts gefunden, sag das. Dateien findest du mit search_files (Standardordner docs); nenne einen Treffer-Pfad aus hits als Quelle. Memory-IDs (M-xxxx) sind keine Dateien - nicht mit read_file oeffnen.",
                        tools=["search_memory", "search_files", "read_file", "list_files", "web_search", "fetch_url"], max_steps=6),
     "terminal": dict(name="terminal", role="Befehle im NEXUS-Terminal ausfuehren (Gate entscheidet Rechte), Arbeitsordner Sandbox.",
                      system_prompt="Du bist terminal. Nutze shell_run fuer PowerShell-Befehle. Das Gate entscheidet; BLOCKED-Ergebnisse ehrlich melden, nicht umgehen. Kein C:. Gib die echte Ausgabe wieder.",

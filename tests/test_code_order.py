@@ -227,7 +227,7 @@ class FakeBridge:
         if task == "read_file":
             path = params["path"]
             if path not in self.fs:
-                return {"success": False, "status": "failed", "error_code": "READ_PATH_NOT_ALLOWED",
+                return {"success": False, "status": "failed", "error_code": "NOT_FOUND",
                         "task_id": task_id, "result": None}
             return {"success": True, "status": "succeeded", "task_readback_verified": True,
                     "execution_instance_verified": True, "task_id": task_id,

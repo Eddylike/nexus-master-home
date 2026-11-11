@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def openapi_snippet(base_url: str = "https://wozipc-nexus.tailaf0b38.ts.net") -> dict[str, Any]:
+def openapi_snippet(base_url: str = "https://wozipc-nexus.example.ts.net") -> dict[str, Any]:
     return {
         "openapi": "3.1.0",
         "info": {"title": "NEXUS Agent Bridge", "version": "1.1.0"},
@@ -32,7 +32,7 @@ def capabilities_for_gpt() -> dict[str, Any]:
     return {
         "name": "NEXUS Bridge",
         "auth": "Bearer NEXUS_BRIDGE_TOKEN",
-        "public_url": "https://wozipc-nexus.tailaf0b38.ts.net",
+        "public_url": "https://wozipc-nexus.example.ts.net",
         "local_chat": "http://127.0.0.1:8299/api/assistant",
         "cost": "LOCAL->FREE->NOT",
     }

@@ -1,4 +1,4 @@
-﻿"""MH05-MH12 (20261028): Statuslogik Ollama/ChatGPT, Kacheln -> echte Ziele, kein Ueberlappen."""
+"""MH05-MH12 (20261028): Statuslogik Ollama/ChatGPT, Kacheln -> echte Ziele, kein Ueberlappen."""
 import json
 import re
 from pathlib import Path

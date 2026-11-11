@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#05070f" />
+<title>NEXUS Convergence Chamber</title>
+<link rel="stylesheet" href="css/main.css?v=chatfix20261016" />
+<link rel="stylesheet" href="css/hud.css?v=chatfix20261016" />
+</head>
+<body>
+<div id="app" data-quality="high">
+
+  <!-- ===================== 3D SCENE ===================== -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- ===================== HUD ===================== -->
+  <div class="hud" id="hud">
+
+    <header class="topbar glass">
+      <div class="brand">
+    <!-- Schutz: Verhindert Auslöschung durch externe Tools -->
+    <script type="text/javascript" id="chamber-protection"></script>
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-text">
+          <strong>NEXUS</strong>
+          <em>CONVERGENCE CHAMBER</em>
+        </span>
+      </div>
+      <div class="topbar-mid">
+        <span class="chip" id="chip-source" data-state="demo">LIVE · SharedRoom</span>
+        <span class="chip" id="chip-discussion" data-state="idle">Bereit</span>
+        <span class="chip" id="chip-round" data-state="idle">Runde 0/6</span>
+      </div>
+      <div class="topbar-right">
+        <span class="clock" id="clock">--:--:--</span>
+        <button class="btn" id="btn-meeting" title="Besprechungsansicht umschalten">Besprechung</button>
+        <button class="btn" id="btn-cam" title="Kamerafahrt">Kamera</button>
+        <button class="btn" id="btn-intro" title="Startsequenz erneut">Intro</button>
+        <select class="btn select" id="sel-quality" title="Qualitätsstufe">
+          <option value="high">Qualität: Hoch</option>
+          <option value="medium">Qualität: Mittel</option>
+          <option value="low">Qualität: Niedrig</option>
+        </select>
+      </div>
+    </header>
+
+    <!-- LEFT: agents + discussion -->
+    <aside class="col left">
+      <section class="panel glass" id="panel-agents">
+        <h2 class="panel-title">KI-Kerne</h2>
+        <div id="agent-list" class="agent-list"></div>
+      </section>
+
+      <section class="panel glass" id="panel-discussion">
+        <h2 class="panel-title">Diskussion <span class="mini" id="discussion-topic">—</span></h2>
+        <div class="round-track" id="round-track"></div>
+        <div class="vote-grid" id="vote-grid"></div>
+      </section>
+    </aside>
+
+    <!-- RIGHT: missions + verification + blockers -->
+    <aside class="col right">
+      <section class="panel glass" id="panel-dev">
+        <h2 class="panel-title">Entwicklungszentrale <span class="mini" id="dev-count">0</span></h2>
+        <div id="dev-body" class="dev-body"><div class="mini">Noch kein Entwicklungsauftrag in dieser Sitzung.</div></div>
+      </section>
+      <section class="panel glass" id="panel-missions">
+        <h2 class="panel-title">Missionsdeck <span class="mini" id="mission-count">0</span></h2>
+        <div id="mission-list" class="mission-list"></div>
+      </section>
+
+      <section class="panel glass" id="panel-verify">
+        <h2 class="panel-title">Verification</h2>
+        <div id="verify-body" class="verify-body">
+          <div class="verify-empty">Kein bestätigter Beleg.</div>
+        </div>
+      </section>
+
+      <section class="panel glass danger" id="panel-blockers">
+        <h2 class="panel-title">Blocker / Fehler</h2>
+        <div id="blocker-list" class="blocker-list"><div class="mini">Keine Blocker.</div></div>
+      </section>
+
+      <section class="panel glass" id="panel-console">
+        <h2 class="panel-title">Freigaben <span class="mini" id="console-session">Sitzung: wartet …</span></h2>
+        <div class="console-row">
+          <button type="button" class="btn" id="console-approvals" title="Privilegierte Aktionen ausschließlich über die lokale Freigabeseite">Freigaben öffnen</button>
+        </div>
+      </section>
+
+      <section class="panel glass" id="panel-sysstatus">
+        <h2 class="panel-title">Systemstatus <span class="mini" id="sys-ts">—</span></h2>
+        <div class="sys-row"><span class="sys-k">CPU</span><div class="sys-bar"><i id="sys-cpu-bar"></i></div><b class="sys-v" id="sys-cpu">—</b></div>
+        <div class="sys-row"><span class="sys-k">RAM</span><div class="sys-bar"><i id="sys-ram-bar"></i></div><b class="sys-v" id="sys-ram">—</b></div>
+        <div class="sys-row"><span class="sys-k">Uptime</span><span class="sys-wide" id="sys-up">—</span></div>
+        <div class="sys-row"><span class="sys-k">NEXUS</span><span class="sys-wide" id="sys-nexus">—</span></div>
+        <div class="sys-row"><span class="sys-k">Ollama</span><span class="sys-wide" id="sys-ollama">—</span></div>
+        <div class="sys-alerts" id="sys-alerts"></div>
+      </section>
+    </aside>
+
+    <!-- BOTTOM: timeline + transport -->
+    <footer class="bottombar glass">
+      <div class="transport">
+        <button class="btn primary" id="btn-play">▶ Demo starten</button>
+        <button class="btn" id="btn-pause" disabled>⏸ Pause</button>
+        <button class="btn" id="btn-step" disabled>⏭ Schritt</button>
+        <button class="btn" id="btn-reset">↺ Reset</button>
+      </div>
+      <div class="timeline-wrap">
+        <div class="timeline" id="timeline"></div>
+      </div>
+      <div class="pulse-meter" id="pulse-meter" title="Convergence-Puls">
+        <span class="pulse-core"></span>
+        <span class="pulse-label">CONV</span>
+      </div>
+    </footer>
+
+    <!-- CHAT holograms -->
+    <section class="chat-dock glass" id="chat-dock">
+      <h2 class="panel-title">Chamber-Chat <span class="mini">Nachrichten an NEXUS / HERMES</span></h2>
+      <div id="chat-stream" class="chat-stream"></div>
+      <div class="chat-composer">
+        <div class="composer-controls">
+          <div class="seg" role="group" aria-label="Modus">
+            <button type="button" class="btn seg-btn seg-on" data-console-mode="order">Auftrag</button>
+            <button type="button" class="btn seg-btn" data-console-mode="ask">Frage</button>
+            <button type="button" class="btn seg-btn" data-console-mode="comment">Kommentar</button>
+          </div>
+          <div class="seg" role="group" aria-label="Antwort von">
+            <button type="button" class="btn seg-btn seg-on" data-console-target="nexus">NEXUS</button>
+            <button type="button" class="btn seg-btn" data-console-target="hermes">HERMES</button>
+          </div>
+        </div>
+        <textarea id="console-text" class="console-text" rows="2" placeholder="Nachricht an NEXUS / HERMES … (Enter sendet, Shift+Enter = neue Zeile)" spellcheck="false"></textarea>
+        <div class="console-row chat-composer-row">
+          <button type="button" class="btn primary" id="console-send">Senden</button>
+          <div class="console-status" id="console-status" data-state="idle">Bereit.</div>
+        </div>
+        <div class="console-hint" id="console-hint"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ===================== MEETING VIEW ===================== -->
+  <div class="meeting" id="meeting" hidden>
+    <div class="meeting-head glass">
+      <div>
+        <span class="mini">Besprechungsansicht</span>
+        <h2 id="meeting-topic">Keine aktive Diskussion</h2>
+      </div>
+      <button class="btn" id="btn-meeting-close">Schließen</button>
+    </div>
+    <div class="meeting-body" id="meeting-body"></div>
+  </div>
+
+  <!-- ===================== BOOT / INTRO ===================== -->
+  <div class="boot" id="boot">
+    <div class="boot-inner">
+      <div class="boot-sigil" aria-hidden="true"></div>
+      <h1 class="boot-title">NEXUS <span>CONVERGENCE CHAMBER</span></h1>
+      <p class="boot-sub">Holografische Orbital-Kommandozentrale · SharedRoom live</p>
+      <ul class="boot-log" id="boot-log"></ul>
+      <button class="btn primary xl" id="btn-boot">INITIALISIEREN</button>
+      <p class="boot-note">Live-Ansicht der NEXUS-Sitzung. Ausführung ausschließlich über NEXUS.</p>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<!-- ===================== SCRIPTS (classic, lokal) ===================== -->
+<script src="vendor/three.min.js"></script>
+<script src="js/util.js?v=chatfix20261016"></script>
+<script src="js/state.js?v=chatfix20261016"></script>
+<script src="js/adapter.js?v=chatfix20261016"></script>
+<script src="js/scene.js?v=chatfix20261016"></script>
+<script src="js/starfield.js?v=chatfix20261016"></script>
+<script src="js/earth.js?v=chatfix20261016"></script>
+<script src="js/agents.js?v=chatfix20261016"></script>
+<script src="js/beams.js?v=chatfix20261016"></script>
+<script src="js/effects.js?v=chatfix20261016"></script>
+<script src="js/camera.js?v=chatfix20261016"></script>
+<script src="js/timeline.js?v=chatfix20261016"></script>
+<script src="js/missions.js?v=chatfix20261016"></script>
+<script src="js/chat.js?v=chatfix20261016"></script>
+<script src="js/verification.js?v=chatfix20261016"></script>
+<script src="js/composer.js?v=chatfix20261016"></script>
+<script src="js/sysstatus.js?v=chatfix20261016"></script>
+<script src="js/live.js?v=chatfix20261016"></script>
+<script src="js/main.js?v=chatfix20261016"></script>
+<script src="js/devcenter.js?v=chatfix20261016"></script>
+</body>
+</html>

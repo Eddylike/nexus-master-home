@@ -341,6 +341,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        if path == "/ws/livetalk" or path.startswith("/m/livetalk") or path in ("/livetalk", "/api/livetalk/status"):  # LIVETALK-20261110
+            if path == "/ws/livetalk":  # Live-Talk-WebSocket im bestehenden Handler (ws :8299 / wss :8443)
+                from nexus.livetalk.server import handle_upgrade as _lt_upgrade
+                return _lt_upgrade(self, ENGINE)
+            if path == "/api/livetalk/status":
+                from nexus.livetalk.server import status as _lt_status
+                return self._json(200, _lt_status())
+            return self._bytes(200, (STATIC_DIR / "livetalk.html").read_bytes(), "text/html; charset=utf-8")
+        # MOBILE-INBOX-20261110 Handy-Fotos/Dateien (Token-Pflicht, Ablage workspace/inbox/mobile)
+        if path == '/api/livetalk/inbox' or path.startswith('/api/livetalk/inbox/') or path == '/api/livetalk/outbox' or path.startswith('/api/livetalk/outbox/'):
+            from nexus.mobile_inbox import handle_http as _mb_inbox
+            if _mb_inbox(self, 'GET', path):
+                return
         try:  # NEXUS OS live link evidence (memory only): last request per client IP
             from nexus import nexus_os as _nos
             _nos.note_client(self.client_address[0], path)
@@ -360,6 +373,18 @@ class Handler(BaseHTTPRequestHandler):
         if bridge_api is not None and bridge_api.is_maintenance_path(path):
             return bridge_api.handle_maintenance_get(self, path, qs)
         try:
+            if path == "/api/sprechzimmer" or path.startswith("/api/sprechzimmer/"):
+                if self.client_address[0] not in ("127.0.0.1", "::1") or self.headers.get("X-Forwarded-For"):
+                    return self._json(403, {"success": False, "error": "LOOPBACK_ONLY"})
+                from nexus.sprechzimmer.api import handle as _sz_handle
+                from nexus.sprechzimmer.service import make_ask as _sz_ask
+                _sz_base = ROOT / "workspace" / "sprechzimmer"
+                return self._json(*_sz_handle("GET", path, None, _sz_base, _sz_ask(_sz_base)))
+            if path == "/api/mission" or path.startswith("/api/mission/"):
+                if self.client_address[0] not in ("127.0.0.1", "::1") or self.headers.get("X-Forwarded-For"):
+                    return self._json(403, {"success": False, "error": "LOOPBACK_ONLY"})
+                from nexus.mission.api import handle as _ms_handle
+                return self._json(*_ms_handle("GET", path, None, qs, self.client_address[0], self.headers))
             if path in ("/", "/index.html"):
                 try:  # NEXUS-Terminal: UI-Geheimnis nur fuer lokale Browser-Navigation (Same-Origin-Cookie)
                     if (self.client_address[0] in ("127.0.0.1", "::1") and not self.headers.get("X-Forwarded-For")
@@ -401,6 +426,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._serve_preview(path[len("/preview/"):])
             if path == "/api/previews":
                 return self._json(200, _preview_list())
+            if path == "/api/library":
+                try:
+                    from skills.library import filter_library
+                    category = (qs.get("category") or [None])[0]
+                    tag = (qs.get("tag") or [None])[0]
+                    items = filter_library(category=category or None, tag=tag or None)
+                    return self._json(200, {"success": True, "count": len(items), "items": items})
+                except Exception as exc:
+                    return self._json(500, {"success": False, "error": str(exc)})
             if path == "/api/dev/orders":
                 return self._json(200, _dev_orders((qs.get("session_id") or [""])[0]))
             if path.startswith("/preview-evidence/"):
@@ -447,6 +481,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200 if _r else 404, {"success": bool(_r), "run": _r} if _r else {"success": False, "error": "not_found"})
             if path in ("/swarm", "/swarm.html"):
                 return self._bytes(200, (STATIC_DIR / "swarm.html").read_bytes(), "text/html; charset=utf-8")
+            if path in ("/kommando", "/kommando.html"):  # NEXUS Kommandozentrale: Agenten, Missionen, Sprechzimmer, Deep Health
+                return self._bytes(200, (STATIC_DIR / "kommando.html").read_bytes(), "text/html; charset=utf-8")
+            if path in ("/konzil", "/konzil.html"):  # Konzil der fuenf Stimmen (20261104)
+                return self._bytes(200, (STATIC_DIR / "konzil.html").read_bytes(), "text/html; charset=utf-8")
+            if path.startswith("/api/konzil/"):  # Konzil-API (20261104)
+                from nexus.games.konzil.api import handle as _kz
+                if _kz(self, "GET", path, None):
+                    return
+            if path.startswith("/api/games/haus5t/"):  # Haus der fuenf Tueren (20261105)
+                if self.client_address[0] not in ("127.0.0.1", "::1"):
+                    _ag = self._agent_guard()
+                    if not _ag[0]:
+                        return self._json(403, {"success": False, "error": _ag[1]})
+                from nexus.games.haus5t.api import handle as _h5
+                _code, _body = _h5("GET", path, {})
+                return self._json(_code, _body)
             if path == "/api/autobuild/status":  # Selbstbau-Engine (20261028)
                 from nexus.autobuild.loop import get_autobuild
                 return self._json(200, get_autobuild().status())
@@ -480,8 +530,19 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(200, {"success": True, "audit": _tg.audit_tail(int((qs.get("limit") or ["200"])[0]))})
                 if path == "/api/terminal/sessions":
                     return self._json(200, {"success": True, "pwsh": _term.pwsh_path(), "sessions": _term.sessions()})
-            if path == "/api/health":
+            if path in ("/api/health", "/health"):
                 return self._json(200, ENGINE.health())
+            if path == "/api/bauprotokoll/health":  # aggregierte Health-Uebersicht aller Dienste
+                from nexus.bauprotokoll.health import check_all
+                return self._json(200, check_all())
+            if path == "/api/health/deep":  # Deep Health: Erreichbarkeit != Funktionsfaehigkeit
+                if self.client_address[0] not in ("127.0.0.1", "::1") or self.headers.get("X-Forwarded-For"):
+                    return self._json(403, {"success": False, "error": "LOOPBACK_ONLY"})
+                from nexus.health.deep import deep_health
+                _probe = (qs.get("probe") or ["0"])[0] in ("1", "true", "yes")
+                _ph_raw = (qs.get("probe_hermes") or [None])[0]
+                _ph = _probe if _ph_raw is None else _ph_raw in ("1", "true", "yes")
+                return self._json(200, deep_health(probe=_probe, probe_hermes=_ph, in_process=True))
             if path == "/api/ai/models" or path == "/api/ai/status":
                 from nexus.common import ai_layer
                 return self._json(200, {"success": True, "ok": True, **ai_layer.status(ENGINE.master.llm)})
@@ -506,6 +567,14 @@ class Handler(BaseHTTPRequestHandler):
                 data = monitor_collect(write_history=False)
                 return self._json(200, {"success": True, "alerts": data.get("alerts") or [], "timestamp": data.get("timestamp")})
 
+            if path == "/api/chat/think":  # THINK-01: globaler Denkprozess-Schalter
+                from nexus.common import think_panel as _tp
+                return self._json(200, _tp.settings())
+            if path == "/api/chat/thinking":  # THINK-04: gespeicherte Denkprozesse einer Sitzung
+                from nexus.common import think_panel as _tp
+                sid = (qs.get("session_id") or qs.get("id") or [None])[0]
+                s = ENGINE.get_session(sid)
+                return self._json(200, {"success": True, "session_id": s.get("id"), "items": _tp.thinking_index(s)})
             if path == "/api/sessions":
                 return self._json(200, {"success": True, "active": ENGINE.session_id, "sessions": ENGINE.list_sessions()})
             if path == "/api/session":
@@ -694,13 +763,33 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        # MOBILE-INBOX-20261110 vor _read_json, damit Multipart-Body nicht als JSON gelesen wird
+        if path == '/api/livetalk/inbox' or path.startswith('/api/livetalk/inbox/'):
+            from nexus.mobile_inbox import handle_http as _mb_inbox
+            if _mb_inbox(self, 'POST', path):
+                return
         try:  # NEXUS OS live link evidence (memory only): last request per client IP
             from nexus import nexus_os as _nos
             _nos.note_client(self.client_address[0], path)
         except Exception:
             pass
         body = self._read_json()
+        if path == "/api/livetalk/pair":  # LIVETALK-20261110 Handy-Browser koppeln (Code nur lokal erzeugt)
+            from nexus.livetalk import auth as _lt_auth
+            _b = body if isinstance(body, dict) else {}
+            return self._json(*_lt_auth.exchange(_b.get("code"), self.client_address[0], self.headers, _b.get("label") or ""))
         try:  # Live-Monitor (20261028): Agent-Auftraege sichtbar machen
+            if path.startswith("/api/konzil/"):  # Konzil-API (20261104)
+                from nexus.games.konzil.api import handle as _kz
+                if _kz(self, "POST", path, body):
+                    return
+            if path.startswith("/api/games/haus5t/"):  # Haus der fuenf Tueren (20261105)
+                _ag = self._agent_guard()
+                if not _ag[0]:
+                    return self._json(403, {"success": False, "error": _ag[1]})
+                from nexus.games.haus5t.api import handle as _h5
+                _code, _body = _h5("POST", path, body if isinstance(body, dict) else {})
+                return self._json(_code, _body)
             from nexus.common import live_events as _le
             if path == "/api/live/emit":
                 if self.client_address[0] not in ("127.0.0.1", "::1"):
@@ -835,6 +924,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _do_post_dispatch(self, path: str, body: dict) -> None:
         try:
+            if path == "/api/sprechzimmer" or path.startswith("/api/sprechzimmer/"):
+                if self.client_address[0] not in ("127.0.0.1", "::1") or self.headers.get("X-Forwarded-For"):
+                    return self._json(403, {"success": False, "error": "LOOPBACK_ONLY"})
+                from nexus.sprechzimmer.api import handle as _sz_handle
+                from nexus.sprechzimmer.service import make_ask as _sz_ask
+                _sz_base = ROOT / "workspace" / "sprechzimmer"
+                return self._json(*_sz_handle("POST", path, body, _sz_base, _sz_ask(_sz_base)))
+            if path == "/api/mission" or path.startswith("/api/mission/"):
+                if self.client_address[0] not in ("127.0.0.1", "::1") or self.headers.get("X-Forwarded-For"):
+                    return self._json(403, {"success": False, "error": "LOOPBACK_ONLY"})
+                from nexus.mission.api import handle as _ms_handle
+                return self._json(*_ms_handle("POST", path, body, {}, self.client_address[0], self.headers))
             # Only Master Home requests explicitly opt into persistent partner turns.
             # Never interpret a Hermes CLI session_id as a NEXUS chat identifier.
             direct_partner_route = path in ("/api/hermes/agent", "/api/aether/agent") or (
@@ -901,7 +1002,7 @@ class Handler(BaseHTTPRequestHandler):
                     out.setdefault("session_id", body.get("session_id") or ENGINE.session_id)
                     return self._json(200, self._partner_response(body, out, "gpt"))
                 msg = body.get("message") or body.get("text") or ""
-                return self._json(200, ENGINE.chat(msg, body.get("session_id"), body.get("project_id"), model=body.get("model")))
+                return self._json(200, ENGINE.chat(msg, body.get("session_id"), body.get("project_id"), model=body.get("model"), source=body.get("source")))
 
             # AETHER — lokaler Agent, festes vorhandenes Ollama-Modell; keine Ersatzantwort.
             if path == "/api/aether/supervisor":  # 2026-11-02 Supervisor-MVP
@@ -1017,6 +1118,10 @@ class Handler(BaseHTTPRequestHandler):
 
             if path == "/api/chat/stream":
                 return self._chat_stream(body)
+            if path == "/api/chat/think":  # THINK-01: Schalter setzen {"enabled": true|false}
+                from nexus.common import think_panel as _tp
+                data = _tp.set_enabled(bool(body.get("enabled")))
+                return self._json(200, {"success": True, **data})
 
             if path == "/api/voice/chat":
                 msg = body.get("message") or body.get("text") or ""
@@ -1124,6 +1229,16 @@ class Handler(BaseHTTPRequestHandler):
             # Sessions
             if path == "/api/sessions/new":
                 return self._json(200, ENGINE.new_session(body.get("title", "Neuer Chat")))
+            if path == "/api/sessions/append_turn":  # 2026-11-04 HAUS5T, nur Loopback/Agent-Guard
+                _ag = self._agent_guard()
+                if not _ag[0]:
+                    return self._json(403, {"success": False, "error": _ag[1]})
+                try:
+                    return self._json(200, ENGINE.append_game_turn(str(body.get("session_id") or ""), str(body.get("speaker") or "NEXUS"),
+                                                                   str(body.get("content") or ""), str(body.get("partner") or "nexus"),
+                                                                   str(body.get("role") or "assistant"), body.get("meta")))
+                except ValueError as exc:
+                    return self._json(404, {"success": False, "error": str(exc)})
             if path == "/api/sessions/rename":
                 return self._json(200, ENGINE.rename_session(body.get("id") or body.get("session_id"), body.get("title", "")))
             if path == "/api/sessions/delete":
@@ -1467,10 +1582,16 @@ class Handler(BaseHTTPRequestHandler):
         self._sse_start()
         # 2026-10-28 CHAT04: Neu generieren / Bearbeiten; Generator bei Abbruch sofort schliessen (beendet Ollama-Request)
         _rw = "regenerate" if body.get("regenerate") else ("edit" if body.get("edit") else None)
+        # THINK-01 2026-11-10: Denkprozess je Anfrage (Body 'think' oder globaler Schalter)
+        from nexus.common import think_panel as _tp
+        _think_on = _tp.resolve_request_think(body)
+        _think_tok = _tp.set_override(_think_on)
         _gen = ENGINE.chat_stream(msg, body.get("session_id"), body.get("project_id"), model=body.get("model"), **({"rewrite": _rw} if _rw else {}))
         try:
             for ev in _gen:
-                if ev.get("type") == "token":
+                if ev.get("type") == "thinking":
+                    self._sse_event({"type": "thinking", "text": ev.get("text", "")})
+                elif ev.get("type") == "token":
                     self._sse_event({"type": "token", "text": ev.get("text", "")})
                 elif ev.get("type") == "done":
                     self._sse_event({
@@ -1483,6 +1604,8 @@ class Handler(BaseHTTPRequestHandler):
                         "error": ev.get("error"),
                         "data": ev.get("data"),
                         "plan": ev.get("plan"),
+                        "thinking": ev.get("thinking") or "",
+                        "think": _think_on,
                         **{key: ev[key] for key in IDENTITY_FIELDS if key in ev},
                     })
             self._sse_event("[DONE]")
@@ -1506,6 +1629,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._sse_event("[DONE]")
             except Exception:
                 pass
+        finally:
+            _tp.reset_override(_think_tok)
 
     def _vision_analyze(self, body: dict, save_screen: bool = False) -> None:
         b64 = body.get("image") or body.get("image_b64") or ""
@@ -1721,6 +1846,14 @@ def main() -> None:
         print("NEXUS OS status monitor started", flush=True)
     except Exception as e:
         print(f"NEXUS OS status monitor not started: {type(e).__name__}", flush=True)
+
+    try:
+        # Konzil der fuenf Stimmen: Watchdog setzt laufendes Spiel nach Neustart fort (20261104)
+        from nexus.games.konzil.api import start_watchdog as _kz_wd
+        if _kz_wd():
+            print("Konzil watchdog started", flush=True)
+    except Exception as e:
+        print(f"Konzil watchdog not started: {type(e).__name__}", flush=True)
 
     try:
         # Selbstbau-Engine: startet automatisch (Stop: POST /api/autobuild/stop oder workspace/autobuild/STOP)

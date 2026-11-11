@@ -13,9 +13,21 @@ from nexus.common.ai_layer import keep_alive_value, load_config, ollama_base_url
 
 PARTNER = "gpt"
 PROVIDER = "ollama"
+# 2026-11-09 FIXALL: Primaermodell = ai_models.json strong/chat (9b). 4b nur Fallback,
+# weil 9b+4b nicht gleichzeitig in 8GB VRAM passen (Eddie 2026-11-02).
 MODEL = "qwen3.5:9b"
-FALLBACK_MODEL = "qwen3.5:9b"  # 2026-11-02: kein 4b-Nachladen
+FALLBACK_MODEL = "qwen3.5:4b"
 TIMEOUT = 120
+
+def preferred_model() -> str:
+    """Zentrale Vorgabe aus workspace/apex/ai_models.json (roles.strong / chat_model)."""
+    try:
+        cfg = load_config()
+        roles = cfg.get("roles") if isinstance(cfg.get("roles"), dict) else {}
+        return str(roles.get("strong") or cfg.get("chat_model") or MODEL)
+    except Exception:
+        return MODEL
+
 SYSTEM_PROMPT = (
     "Du bist NEXUS GPT in NEXUS Master Home und laeufst lokal ueber Ollama (kein OpenAI). "
     "Schwerpunkte: Aufgabenplanung, Analyse, Wissen, Beratung. Plaene als nummerierte, pruefbare Schritte. "
@@ -52,7 +64,7 @@ def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx
         return {**_base(), "success": False, "reply": "", "error": "MESSAGE_REQUIRED"}
     cfg = load_config()
     payload = {
-        "model": _model or MODEL,
+        "model": _model or preferred_model(),
         "think": False,
         "stream": False,
         "keep_alive": keep_alive_value(cfg),

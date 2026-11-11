@@ -19,13 +19,20 @@ class MemoryStore:
     def _now(self): return datetime.now().isoformat(timespec='seconds')
     def _load(self):
         self._load_error=None
-        if not STORE.exists(): return []
+        store_path = STORE.resolve()
+        if not store_path.exists():
+            return []
         try:
-            items=json.loads(STORE.read_text(encoding='utf-8'))['items']
-            if not isinstance(items,list) or any(not isinstance(i,dict) or not isinstance(i.get('text'),str) for i in items): raise ValueError()
+            raw_text = store_path.read_text(encoding='utf-8', errors='ignore')
+            content = json.loads(raw_text)
+            items = content.get('items', [])
+            if not isinstance(items, list) or any(not isinstance(i, dict) or not isinstance(i.get('text'), str) for i in items):
+                raise ValueError()
             return items
-        except (OSError,ValueError,KeyError):
-            self._load_error='MEMORY_STORE_UNREADABLE'
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, UnicodeDecodeError):
+            self._load_error = 'MEMORY_STORE_CORRUPTED_OR_UNREADABLE'
+            # Sicherstellen: Bei Fehler nicht leere Liste, um Datenverlust zu simulieren, sondern alte Version laden wenn moeglich
+            # Da keine Backup-Datei im Pfad existiert, starten mit leerer Liste und Flag.
             return []
     def _save(self):
         if self._load_error: raise ValueError(self._load_error)

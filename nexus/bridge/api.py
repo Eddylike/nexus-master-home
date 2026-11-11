@@ -64,6 +64,7 @@ def _norm_path(path: str) -> str:
 def is_bridge_get(path: str) -> bool:
     p = _norm_path(path)
     if p in (
+        "/health",
         "/api/bridge/health",
         "/api/capabilities",
         "/api/bridge/status",
@@ -188,7 +189,7 @@ def handle_get(handler, path: str, qs: dict) -> None:
     raw_path = path
     p = _norm_path(path)
 
-    if p in ("/api/bridge/health", "/api/bridge/status") or raw_path == "/api/v1/status":
+    if p in ("/health", "/api/bridge/health", "/api/bridge/status") or raw_path == "/api/v1/status":
         return handler._json(200, health_payload())
 
     if p in ("/api/bridge/skills", "/api/skills"):

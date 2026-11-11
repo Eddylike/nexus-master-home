@@ -5,7 +5,7 @@ NEXUS SHELL / ORBITAL panel (index.html) and the PWA (/m). No secrets are read
 or written here; the Bridge token is never touched.
 
 Layers
-  * devices : WOZIPC, NEXUSPHONE (+ TERMUX, PHONE_AGENT as phone sub-layers)
+  * devices : WOZIPC, NEXUSPHONE (+ TERMUX inventory)
   * ai      : WOZIPC_LOCAL_AI, PHONE_LOCAL_AI, GLOBAL_LOCAL_AI, ACTIVE_AI_PROVIDER
   * overall : CORE, OPERATING_MODE, SYSTEM_HEALTH, CRITICAL_FAILURE, CORE_OPERATIONAL
 
@@ -23,8 +23,7 @@ Rules
   * GLOBAL_LOCAL_AI = ONLINE if >= 1 local AI backend is really reachable
   * a disconnected phone never sets CORE offline (-> PC_FALLBACK / DEGRADED)
   * CHATGPT is OPTIONAL and never a reason for DEGRADED/red
-  * phone path is read-only: adb devices / adb forward / GET /health,
-    tailscale status --json. Phase-A control port is 8766 (legacy 8765 retired).
+  * phone path is read-only: adb device inventory + Tailscale peer reachability; no phone-control service.
 """
 from __future__ import annotations
 
@@ -81,13 +80,13 @@ STATE_VOCAB = {
     OPTIONAL: AVAILABLE,                   # optional provider configured (no paid test call); UNAVAILABLE if not configured
     AVAILABLE: AVAILABLE, UNAVAILABLE: UNAVAILABLE,
 }
-# Phone control chain is strictly ONLINE / OFFLINE / UNKNOWN (Eddie, 06.10.)
-_TRI_STATE_KEYS = ("TERMUX", "PHONE_AGENT", "PHONE_CONTROL")
+# Termux inventory is strictly ONLINE / OFFLINE / UNKNOWN.
+_TRI_STATE_KEYS = ("TERMUX",)
 VOCABULARY_DOC = {
     "states": list(STATES),
     "mapping_from_status": {k: v for k, v in STATE_VOCAB.items()},
     "tri_state_components": list(_TRI_STATE_KEYS),
-    "notes": "TERMUX/PHONE_AGENT/PHONE_CONTROL: FAILED/UNAVAILABLE_TEMPORARILY/DISCONNECTED -> OFFLINE (reason/dependency bleiben). "
+    "notes": "TERMUX: FAILED/UNAVAILABLE_TEMPORARILY/DISCONNECTED -> OFFLINE (reason/dependency bleiben). "
              "CHATGPT: AVAILABLE wenn konfiguriert, sonst UNAVAILABLE; nie ONLINE ohne echten (kostenpflichtigen) Call.",
 }
 
@@ -115,15 +114,7 @@ PROVIDER_PHONE_LOCAL = "PHONE_LOCAL_AI"
 PROVIDER_WOZIPC_LOCAL = "WOZIPC_LOCAL_AI"
 PROVIDER_CHATGPT_OPTIONAL = "CHATGPT_OPTIONAL"
 
-# Phone side: Phase-A control service (Termux, binds 127.0.0.1:8766 on the phone),
-# reached read-only through a host-side adb forward.
-PHASE_A_REMOTE_PORT = 8766
-PHASE_A_FORWARD_PORT = 18766
-LEGACY_AGENT_REMOTE_PORTS = (8765,)  # retired NEXUS_TERMUX_AGENT - forwards get cleaned up
-# legacy names (old callers import these)
-TERMUX_AGENT_LOCAL_PORT = PHASE_A_REMOTE_PORT
-TERMUX_AGENT_FORWARD_PORT = PHASE_A_FORWARD_PORT
-TERMUX_STAGE_REMOTE = "/sdcard/Download/NEXUS_TRANSFER"
+# Retired phone-control ports and ADB forwarding constants removed.
 
 _TAILSCALE_EXE = r"C:\Program Files\Tailscale\tailscale.exe"
 _ADB_FALLBACK = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Android", "Sdk", "platform-tools", "adb.exe")
@@ -132,17 +123,15 @@ _BRIDGE_STATE_DIR = WORKSPACE / "bridge"
 RECHECK_ORDER = [
     "NEXUSPHONE (adb devices; else tailscale ping --c 1 --timeout 3s <peer>, cached)",
     "TERMUX (adb: pidof com.termux)",
-    "PHONE_AGENT (adb forward tcp:18766->tcp:8766, GET /health)",
     "WOZIPC_LOCAL_AI (Ollama /api/tags)",
     "MODEL (configured model present; POST /api/generate num_predict=1 keep_alive=0, cached)",
-    "PHONE_CONTROL (POST /action file_status, read-only)",
     "SHARED_ROOM (POST /api/shared-room/message + GET /api/shared-room/status roundtrip on NEXUS-OS-HEALTH, cached)",
     "VOICE (POST /api/voice/tts -> audio/mpeg, cached)",
 ]
 
 DISPLAY_ORDER = [
-    "CORE", "OPERATING_MODE", "WOZIPC", "WOZIPC_LOCAL_AI", "PHONE_DEVICE", "PHONE_CONTROL", "TERMUX",
-    "PHONE_AGENT", "PHONE_LOCAL_AI", "GLOBAL_LOCAL_AI", "ACTIVE_AI_PROVIDER", "CHATGPT",
+    "CORE", "OPERATING_MODE", "WOZIPC", "WOZIPC_LOCAL_AI", "PHONE_DEVICE", "TERMUX",
+    "PHONE_LOCAL_AI", "GLOBAL_LOCAL_AI", "ACTIVE_AI_PROVIDER", "CHATGPT",
     "SHARED_ROOM", "VOICE", "NETWORK", "BRIDGE", "SYSTEM_HEALTH", "CRITICAL_FAILURE",
 ]
 LINK_ORDER = ["PHONE_CORE", "CORE_WOZIPC", "CORE_CHATGPT"]
@@ -169,8 +158,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "room_check_ttl_sec": 600,
     "ai_inference_ttl_sec": 600,           # real minimal inference (num_predict=1, keep_alive=0), cached
     "phone_link_window_sec": 90,           # PHONE_CORE ONLINE only with an inbound phone request in this window
-    "phase_a_port": PHASE_A_REMOTE_PORT,
-    "phase_a_forward_port": PHASE_A_FORWARD_PORT,
     "bridge_gateway_port": 8300,
     "bridge_origin_port": 8299,
     "recheck_interval_sec": 45,
@@ -181,7 +168,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "cache_ttl_sec": 15,
     "notes": (
         "NEXUS OS identity + provider slots. Keine Geheimnisse in dieser Datei. "
-        "Phone-Pfad nur lesend: adb forward tcp:18766->8766 (Phase-A /health), tailscale status. "
+        "Phone-Pfad: adb device inventory + Tailscale peer reachability only. "
         "CHATGPT_OPTIONAL bleibt optional und blockiert nie Health."
     ),
 }
@@ -322,6 +309,31 @@ def _phone_ai_from_heartbeat(dev_get=None) -> dict[str, Any] | None:
     return _field(OFFLINE, src, "Ollama am Handy antwortet nicht", reason="PHONE_AI_NOT_RUNNING", **extra)
 
 
+PHONE_APP_LINK_MAX_AGE_S = 150.0  # app cycles every 60 s; 2.5 cycles tolerance
+
+
+def _paired_app_link(getter=None) -> dict[str, Any] | None:
+    """MOBILE 20261109: fresh authenticated contact of the PAIRED NEXUS OS app (valid Bearer on
+    /api/nexus-os/sync). Only this counts as a real phone link without ADB/Tailscale -
+    the unauthenticated heartbeat alone never does. None = no fresh paired contact."""
+    try:
+        if getter is None:
+            from nexus import nexus_os_link as _link
+            getter = _link.paired_contact_get
+        rec = getter()
+    except Exception:
+        return None
+    if not isinstance(rec, dict):
+        return None
+    try:
+        age = float(rec.get("age_s"))
+    except (TypeError, ValueError):
+        return None
+    if age < 0 or age > PHONE_APP_LINK_MAX_AGE_S:
+        return None
+    return {"age_s": round(age, 1), "route": rec.get("route_ip_kind") or "unknown", "path": rec.get("path")}
+
+
 def _tcp_open(host: str, port: int, timeout: float = 1.5) -> bool:
     try:
         with socket.create_connection((host, int(port)), timeout=timeout):
@@ -443,7 +455,6 @@ _ADB_MESSAGES = {
     "DEVICE_UNAUTHORIZED": "Geraet nicht autorisiert: USB-Debugging-Dialog auf dem Handy bestaetigen",
     "DEVICE_OFFLINE": "Geraet im ADB-Zustand offline: Kabel neu stecken oder 'adb reconnect'",
     "SERIAL_NOT_FOUND": "Gewuenschtes Geraet (Serial) nicht verbunden",
-    "FORWARD_FAILED": "adb forward konnte nicht eingerichtet werden",
     "ADB_ERROR": "adb devices lieferte einen Fehler",
 }
 
@@ -468,64 +479,6 @@ def _pick_serial(info: dict[str, Any], preferred: str = "") -> tuple[str, str | 
 def _adb_ready_serial(preferred: str = "") -> str:
     serial, _ = _pick_serial(adb_devices(), preferred or load_config().get("phone_adb_serial") or "")
     return serial
-
-
-def _forward_list() -> list[tuple[str, str, str]]:
-    rc, out, _ = _run([_adb_exe(), "forward", "--list"], timeout=8.0)
-    entries = []
-    if rc == 0:
-        for line in (out or "").splitlines():
-            parts = line.split()
-            if len(parts) == 3:
-                entries.append((parts[0], parts[1], parts[2]))
-    return entries
-
-
-def ensure_adb_forward(local_port: int = PHASE_A_FORWARD_PORT, remote_port: int = PHASE_A_REMOTE_PORT,
-                       serial: str = "", *, cleanup_legacy: bool = True,
-                       devices: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Idempotent adb forward setup with conflict + legacy cleanup.
-
-    Never runs a shell on the device. Returns {ok, code, message, serial, actions}.
-    Called on every status cycle, so a re-plugged phone gets its forward back
-    automatically (reconnect recovery)."""
-    info = devices if devices is not None else adb_devices()
-    if not info.get("adb"):
-        return {"ok": False, "code": "ADB_NOT_FOUND", "message": _ADB_MESSAGES["ADB_NOT_FOUND"], "serial": None, "actions": []}
-    preferred = serial or str(load_config().get("phone_adb_serial") or "")
-    sel, err = _pick_serial(info, preferred)
-    if not sel:
-        code = err or "NO_DEVICE"
-        return {"ok": False, "code": code, "message": "ADB forward to Termux agent failed: " + _ADB_MESSAGES.get(code, code),
-                "serial": None, "actions": [], "devices": info.get("devices")}
-    adb = _adb_exe()
-    want_l, want_r = "tcp:%d" % int(local_port), "tcp:%d" % int(remote_port)
-    actions: list[str] = []
-    entries = _forward_list()
-    if cleanup_legacy:
-        for s, l, r in entries:
-            if any(r == "tcp:%d" % p for p in LEGACY_AGENT_REMOTE_PORTS):
-                rc, _, _ = _run([adb, "-s", s, "forward", "--remove", l], timeout=8.0)
-                actions.append("removed legacy forward %s %s->%s rc=%s" % (s, l, r, rc))
-        if actions:
-            entries = _forward_list()
-    if (sel, want_l, want_r) in entries:
-        return {"ok": True, "code": "FORWARD_PRESENT", "message": "forward vorhanden", "serial": sel,
-                "forward": "%s->%s" % (want_l, want_r), "actions": actions}
-    for s, l, r in entries:
-        if l == want_l:
-            rc, _, _ = _run([adb, "-s", s, "forward", "--remove", l], timeout=8.0)
-            actions.append("removed conflicting forward %s %s->%s rc=%s" % (s, l, r, rc))
-    rc, _, err_txt = _run([adb, "-s", sel, "forward", want_l, want_r], timeout=10.0)
-    if rc != 0:
-        return {"ok": False, "code": "FORWARD_FAILED",
-                "message": "ADB forward to Termux agent failed: %s (%s)" % (_ADB_MESSAGES["FORWARD_FAILED"], (err_txt or "").strip()[:160]),
-                "serial": sel, "actions": actions}
-    ok = (sel, want_l, want_r) in _forward_list()
-    actions.append("created forward %s %s->%s" % (sel, want_l, want_r))
-    return {"ok": ok, "code": "FORWARD_CREATED" if ok else "FORWARD_FAILED",
-            "message": "forward eingerichtet" if ok else "ADB forward to Termux agent failed: forward nicht in --list",
-            "serial": sel, "forward": "%s->%s" % (want_l, want_r), "actions": actions}
 
 
 def _termux_packages(serial: str) -> list[str]:
@@ -562,48 +515,6 @@ def phone_status(preferred: str = "") -> dict[str, Any]:
     if "com.termux" not in pkgs:
         out["error"] = "termux_not_installed"
     return out
-
-
-def phase_a_health(serial: str = "", timeout: float = 3.0, devices: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Read-only Phase-A control probe through adb forward (GET /health only)."""
-    cfg = load_config()
-    lp = int(cfg.get("phase_a_forward_port") or PHASE_A_FORWARD_PORT)
-    rp = int(cfg.get("phase_a_port") or PHASE_A_REMOTE_PORT)
-    fw = ensure_adb_forward(lp, rp, serial, devices=devices)
-    base = {"agent_port": rp, "forward_port": lp, "forward": fw, "chat_capable": False}
-    if not fw.get("ok"):
-        return {**base, "reachable": False, "status": UNAVAILABLE_TEMPORARILY, "reason": fw.get("code"),
-                "error": fw.get("message"), "device": fw.get("serial")}
-    res = _http("http://127.0.0.1:%d/health" % lp, timeout=timeout)
-    base["device"] = fw.get("serial")
-    if res.get("ok"):
-        data = _json_body(res)
-        if str(data.get("status", "")).upper() == "PASS" and data.get("service") == "NEXUS_PHASE_A_CONTROL":
-            return {**base, "reachable": True, "status": ONLINE, "agent": data.get("service"), "bind": data.get("bind"),
-                    "version": data.get("version"), "code_sha256": data.get("code_sha256"), "pid": data.get("pid"),
-                    "local_ai": data.get("local_ai"), "health": {k: v for k, v in data.items() if k != "local_ai"}}
-        return {**base, "reachable": False, "status": FAILED, "reason": "UNEXPECTED_HEALTH_PAYLOAD",
-                "error": json.dumps(data)[:160]}
-    if res.get("code"):
-        return {**base, "reachable": False, "status": FAILED, "reason": res.get("error"), "error": res.get("error")}
-    kind = res.get("error") or "UNREACHABLE"
-    reason = "AGENT_NOT_LISTENING" if kind in ("REMOTE_CLOSED", "CONNECTION_REFUSED") else "AGENT_" + kind
-    return {**base, "reachable": False, "status": OFFLINE, "reason": reason, "error": res.get("error_detail") or kind}
-
-
-def termux_agent_status(preferred: str = "", timeout: float = 3.0) -> dict[str, Any]:
-    """Legacy entry point (PhoneLocalProvider): phone agent = Phase-A control 8766.
-
-    Uses the monitor snapshot when it is fresh, otherwise probes directly."""
-    with _LOCK:
-        snap = _STATE.get("snapshot")
-        age = time.time() - float(_STATE.get("ts") or 0.0)
-    if snap and age < 90 and not preferred:
-        pa = deepcopy((snap.get("phone") or {}).get("phase_a") or {})
-        if pa:
-            pa["from_snapshot_age_sec"] = round(age, 1)
-            return pa
-    return phase_a_health(preferred, timeout=min(float(timeout or 3.0), 5.0))
 
 
 # --------------------------------------------------------------------------- inbound clients (PHONE_CORE link)
@@ -1155,9 +1066,16 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
         ping_txt = (("pong %s ms via %s" % (int(ping.get("latency_ms") or 0), ping.get("via"))) if ping.get("ok")
                     else ("kein pong (%s)" % ping.get("error"))) + stamp
     common = dict(tailscale_peer=peer, tailscale_ping=ping, peer_identity={k: ident_chk.get(k) for k in ("status", "model", "ip_match", "checked_at")})
+    app_link = _paired_app_link()
+    common["app_link"] = app_link
+    app_txt = (" · App gekoppelt %s vor %ss" % (app_link["route"], int(app_link["age_s"]))) if app_link else ""
     if serial:
-        phone = _field(ONLINE, adb_src, "adb %s%s" % (serial, (" · tailscale %s: %s" % (peer.get("ip"), ping_txt)) if peer else ""),
+        phone = _field(ONLINE, adb_src, "adb %s%s" % (serial, (" · tailscale %s: %s" % (peer.get("ip"), ping_txt)) if peer else "") + app_txt,
                        method="adb", transport="adb", serial=serial, **common)
+    elif app_link:
+        phone = _field(ONLINE, "authentifizierter App-Sync %s (Bearer der Kopplung)" % (app_link.get("path") or "/api/nexus-os/sync"),
+                       "NEXUS OS App gekoppelt ueber %s, letzter Kontakt vor %ss (kein ADB: %s)" % (app_link["route"], int(app_link["age_s"]), adb_err),
+                       method="app_link", transport=app_link["route"], adb_error=adb_err, **common)
     elif ping is not None and ping.get("ok"):
         phone = _field(ONLINE, ping.get("source"), "tailscale %s %s (kein ADB: %s)" % (peer.get("ip"), ping_txt, adb_err),
                        method="tailscale_ping", transport="tailscale", adb_error=adb_err, checked_at=ping.get("checked_at"), **common)
@@ -1200,67 +1118,15 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
     else:
         termux = _field(UNAVAILABLE_TEMPORARILY, "dependency", "Handy nicht erreichbar", reason=phone.get("reason") or "DEVICE_DISCONNECTED", dependency="NEXUSPHONE")
 
-    # ---- 3) PHONE_AGENT (Phase-A control /health via adb forward)
-    if serial:
-        pa = phase_a_health(serial, timeout=3.0, devices=adb)
-        src = "adb forward tcp:%s->tcp:%s + GET /health" % (pa.get("forward_port"), pa.get("agent_port"))
-        if pa.get("status") == ONLINE:
-            agent = _field(ONLINE, src, "NEXUS_PHASE_A_CONTROL %s" % (pa.get("version") or "(alte Version ohne version-Feld)"),
-                           version=pa.get("version"), code_sha256=pa.get("code_sha256"), forward=pa["forward"].get("code"))
-        elif pa.get("status") == OFFLINE and termux["status"] == OFFLINE:
-            agent = _field(UNAVAILABLE_TEMPORARILY, src, "Phase-A antwortet nicht (%s)" % pa.get("reason"),
-                           reason=pa.get("reason"), dependency="TERMUX", forward=pa["forward"].get("code"))
-        else:
-            agent = _field(pa.get("status") or UNKNOWN, src, str(pa.get("error") or ""), reason=pa.get("reason"),
-                           forward=(pa.get("forward") or {}).get("code"))
-    elif phone["status"] == ONLINE:
-        pa = {"reachable": False, "status": UNKNOWN, "reason": "NO_ADB_PATH"}
-        agent = _field(UNKNOWN, "adb forward (nicht verfuegbar)", "Phase-A bindet nur 127.0.0.1 am Handy; ohne ADB nicht pruefbar",
-                       reason="NO_ADB_PATH", dependency="ADB")
-    elif phone["status"] == UNKNOWN:
-        pa = {"reachable": False, "status": UNKNOWN, "reason": "DEVICE_STATE_UNKNOWN"}
-        agent = _field(UNKNOWN, "dependency", "Geraetestatus unbekannt", reason="DEVICE_STATE_UNKNOWN", dependency="NEXUSPHONE")
-    else:
-        pa = {"reachable": False, "status": UNAVAILABLE_TEMPORARILY, "reason": phone.get("reason")}
-        agent = _field(UNAVAILABLE_TEMPORARILY, "dependency", "Handy nicht erreichbar",
-                       reason=phone.get("reason") or "DEVICE_DISCONNECTED", dependency="NEXUSPHONE")
-
-    # ---- PHONE_LOCAL_AI (F-03: primaer aus dem App-Heartbeat, Phase-A-Agent nur noch Fallback)
+        # ---- PHONE_LOCAL_AI: only a fresh App heartbeat is authoritative; no Phase-A service or ADB forward.
     phone_ai = _phone_ai_from_heartbeat()
-    if phone_ai is not None:
-        pass
-    elif agent["status"] == ONLINE:
-        la = pa.get("local_ai")
-        if isinstance(la, dict) and la.get("status") == ONLINE:
-            phone_ai = _field(ONLINE, "Phase-A /health.local_ai", str(la.get("detail") or ""), models=la.get("models"))
-        elif isinstance(la, dict) and la.get("status"):
-            phone_ai = _field(OFFLINE if la.get("status") in (OFFLINE, "OFFLINE") else UNKNOWN, "Phase-A /health.local_ai",
-                              str(la.get("detail") or ""), reason=la.get("reason") or "PHONE_AI_NOT_RUNNING")
+    if phone_ai is None:
+        if phone["status"] == ONLINE:
+            phone_ai = _field(UNKNOWN, "App-Heartbeat /api/nexus-os/device", "kein frischer Ollama-Heartbeat vom Handy",
+                              reason="NO_AI_STATUS_IN_HEARTBEAT", dependency="PHONE_AI_HEARTBEAT")
         else:
-            phone_ai = _field(UNKNOWN, "Phase-A /health", "laufende Phase-A-Version meldet keinen local_ai-Check",
-                              reason="AGENT_HAS_NO_AI_PROBE")
-    else:
-        dep = "PHONE_AGENT" if phone["status"] == ONLINE else "NEXUSPHONE"
-        rsn = phone.get("reason") if dep == "NEXUSPHONE" else ("AGENT_NOT_REACHABLE" if agent["status"] != UNKNOWN else "NO_ADB_PATH")
-        # F-03: kein Heartbeat-KI-Feld und kein Agent -> Zustand nicht bekannt (UNKNOWN), nicht OFFLINE/UNAVAILABLE
-        phone_ai = _field(UNKNOWN, "dependency", "kein KI-Status im Heartbeat, Agent nicht erreichbar",
-                          reason="NO_AI_STATUS_IN_HEARTBEAT" if phone["status"] == ONLINE else (rsn or "DEVICE_DISCONNECTED"), dependency=dep)
-
-    # ---- PHONE_CONTROL: NEXUS can really control the phone = Phase-A health OK + harmless read-only action
-    if agent["status"] == ONLINE:
-        fwp = int(cfg.get("phase_a_forward_port") or PHASE_A_FORWARD_PORT)
-        act = _http("http://127.0.0.1:%d/action" % fwp, method="POST", body=json.dumps({"action": "file_status"}).encode("utf-8"),
-                    timeout=5.0, headers={"Content-Type": "application/json"})
-        ad = _json_body(act)
-        if act.get("ok") and ad.get("status") == "PASS":
-            control = _field(ONLINE, "adb forward tcp:%d + POST /action file_status (read-only)" % fwp, "Phase-A steuerbar (file_status PASS)")
-        else:
-            control = _field(OFFLINE, "adb forward tcp:%d + POST /action file_status (read-only)" % fwp,
-                             "Read-only-Task fehlgeschlagen", reason="CONTROL_TASK_FAILED_%s" % (act.get("code") or act.get("error")))
-    elif agent["status"] == UNKNOWN:
-        control = _field(UNKNOWN, "dependency", "Phase-A nicht pruefbar", reason=agent.get("reason") or "NO_ADB_PATH", dependency="PHONE_AGENT")
-    else:
-        control = _field(OFFLINE, "dependency", "Phase-A nicht erreichbar", reason=agent.get("reason") or "AGENT_NOT_REACHABLE", dependency="PHONE_AGENT")
+            phone_ai = _field(UNKNOWN, "dependency", "Handy nicht erreichbar; lokale Handy-KI nicht messbar",
+                              reason=phone.get("reason") or "DEVICE_DISCONNECTED", dependency="NEXUSPHONE")
 
     # ---- 4/5) WOZIPC + local AI
     wozi = wozipc_local_status(cfg=cfg)
@@ -1279,10 +1145,10 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
                      inference_ms=(wozi.get("inference") or {}).get("ms"), inference_checked_at=(wozi.get("inference") or {}).get("checked_at"),
                      models=wozi.get("models"), ollama_process=(wozi.get("process") or {}).get("running"))
 
-    ai_states = (wozi_ai["status"], phone_ai["status"])
+    ai_states = (wozi_ai["status"],)
     if ONLINE in ai_states or BUSY in ai_states:
-        glob = _field(ONLINE, "rule: >=1 lokales KI-Backend ONLINE oder BUSY (erreichbar, arbeitet)",
-                      " + ".join("%s(%s)" % (n, s) for n, s in ((PROVIDER_WOZIPC_LOCAL, ai_states[0]), (PROVIDER_PHONE_LOCAL, ai_states[1])) if s in (ONLINE, BUSY)))
+        glob = _field(ONLINE, "rule: WoZiPC local AI ONLINE or BUSY (reachable, working)",
+                      "%s(%s)" % (PROVIDER_WOZIPC_LOCAL, ai_states[0]))
     elif UNKNOWN in ai_states:
         glob = _field(UNKNOWN, "rule", "kein Backend ONLINE, mindestens eines UNKNOWN", reason="AI_STATE_UNKNOWN")
     else:
@@ -1331,7 +1197,9 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
                      configured=cg.get("configured"), blocks_health=False)
 
     # ---- overall
-    phone_link_ok = phone["status"] == ONLINE and termux["status"] == ONLINE and agent["status"] == ONLINE
+    # Phase-A/Termux control is retired. Termux remains read-only device inventory,
+    # never a dependency for the PC core or the phone's direct app-to-core link.
+    phone_link_ok = phone["status"] == ONLINE
     if not core_ok:
         mode, health, critical = "OFFLINE", CRITICAL, True
     elif glob["status"] == OFFLINE:
@@ -1348,13 +1216,16 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
         else:
             mode = "CORE_ONLY"
         health = HEALTHY
-    required = ["CORE", "BRIDGE", "WOZIPC", "WOZIPC_LOCAL_AI", "NEXUSPHONE", "TERMUX", "PHONE_AGENT",
+    # TERMUX/Phase-A is retired and is reported only as informational inventory.
+    # The handset itself remains a tracked device, but a stopped Termux process
+    # must not degrade an otherwise healthy PC NEXUS installation.
+    required = ["CORE", "BRIDGE", "WOZIPC", "WOZIPC_LOCAL_AI", "NEXUSPHONE",
                 "GLOBAL_LOCAL_AI", "SHARED_ROOM", "VOICE", "NETWORK"]
     if cfg.get("phone_ai_required_for_healthy"):
         required.append("PHONE_LOCAL_AI")
     comp_now = {"CORE": core, "BRIDGE": bridge, "WOZIPC": wozipc_dev, "WOZIPC_LOCAL_AI": wozi_ai, "NEXUSPHONE": phone,
-                "PHONE_DEVICE": dict(phone), "PHONE_CONTROL": control,
-                "TERMUX": termux, "PHONE_AGENT": agent, "PHONE_LOCAL_AI": phone_ai, "GLOBAL_LOCAL_AI": glob,
+                "PHONE_DEVICE": dict(phone),
+                "TERMUX": termux, "PHONE_LOCAL_AI": phone_ai, "GLOBAL_LOCAL_AI": glob,
                 "SHARED_ROOM": shared, "VOICE": voice, "NETWORK": network, "CHATGPT": chatgpt}
     not_ok = [k for k in required
               if comp_now[k]["status"] != ONLINE and not (k == "WOZIPC_LOCAL_AI" and comp_now[k]["status"] == BUSY)]
@@ -1366,8 +1237,6 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
     if wozi_ai["status"] == ONLINE:
         active = PROVIDER_WOZIPC_LOCAL
         active_src = "rule: WoZiPC-Ollama ONLINE (einziger chat-faehiger lokaler Provider)"
-    elif phone_ai["status"] == ONLINE:
-        active = PROVIDER_PHONE_LOCAL
     if provider is not None:
         try:
             r = provider.route("status")
@@ -1433,10 +1302,8 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
     components["ACTIVE_AI_PROVIDER"]["state"] = active
 
     orbital_src = {
-        "PHASE_A": components["PHONE_AGENT"], "BRIDGE": bridge,
+        "BRIDGE": bridge,
         "TAILSCALE": _field(net.get("tailscale", UNKNOWN), ts_src, net.get("tailscale_dns", "")),
-        "TERMUX_AGENT": _field(agent["status"] if agent["status"] != ONLINE else ONLINE, "adb forward --list + /health",
-                               str((pa.get("forward") or {}).get("code") or agent.get("reason") or "")),
         "OLLAMA": wozi_ai, "SHARED_ROOM": shared, "VOICE": voice,
         "ANDROID": _field(ONLINE if serial else (DISCONNECTED if adb.get("adb") else UNKNOWN), adb_src,
                           serial or (adb_err or "")),
@@ -1460,7 +1327,7 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
         "GLOBAL_LOCAL_AI": glob["status"],
         "layers": {
             "devices": {"WOZIPC": wozipc_dev["status"], "NEXUSPHONE": phone["status"], "PHONE_DEVICE": phone["status"],
-                        "PHONE_CONTROL": control["status"], "TERMUX": termux["status"], "PHONE_AGENT": agent["status"]},
+                        "TERMUX": termux["status"]},
             "ai": {"WOZIPC_LOCAL_AI": wozi_ai["status"], "PHONE_LOCAL_AI": phone_ai["status"],
                    "GLOBAL_LOCAL_AI": glob["status"], "ACTIVE_AI_PROVIDER": active},
             "overall": {"CORE": core["status"], "SYSTEM_HEALTH": health, "CRITICAL_FAILURE": critical,
@@ -1474,8 +1341,7 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
         "orbital": orbital,
         "orbital_map": ORBITAL_MAP,
         "phone": {"adb": {k: adb.get(k) for k in ("adb", "devices", "error")}, "tailscale_peer": peer,
-                  "tailscale_ping": ping, "identity": {k: v for k, v in ident_chk.items() if k != "ts"},
-                  "phase_a": pa},
+                  "tailscale_ping": ping, "identity": {k: v for k, v in ident_chk.items() if k != "ts"}},
         "network": net,
         "default_provider": cfg.get("default_provider") or PROVIDER_WOZIPC_LOCAL,
         "fallback_order": cfg.get("fallback_order") or list(DEFAULT_CONFIG["fallback_order"]),
@@ -1483,8 +1349,9 @@ def _probe_cycle(provider: Any = None) -> dict[str, Any]:
         "ok": bool(core_ok and not critical),   # true also when DEGRADED; see health/SYSTEM_HEALTH
         "health": health,
         "critical_unavailable": [k for k in ("CORE", "GLOBAL_LOCAL_AI") if critical and comp_now[k]["status"] != ONLINE],
-        "health_rule": ("Core down -> SYSTEM_HEALTH CRITICAL, NEXUS_OPERATIONAL false. HEALTHY nur wenn CORE, BRIDGE, WOZIPC, WOZIPC_LOCAL_AI, NEXUSPHONE, TERMUX, PHONE_AGENT, GLOBAL_LOCAL_AI, "
-                        "SHARED_ROOM, VOICE, NETWORK ONLINE; PHONE_LOCAL_AI zaehlt nur wenn phone_ai_required_for_healthy=true; "
+        "health_rule": ("Core down -> SYSTEM_HEALTH CRITICAL, NEXUS_OPERATIONAL false. HEALTHY nur wenn CORE, BRIDGE, WOZIPC, WOZIPC_LOCAL_AI, NEXUSPHONE, GLOBAL_LOCAL_AI, "
+                        "SHARED_ROOM, VOICE, NETWORK ONLINE; TERMUX/Phase-A ist nur informative Inventur und kein Health-Gate; "
+                        "PHONE_LOCAL_AI zaehlt nur wenn phone_ai_required_for_healthy=true; "
                         "CHATGPT ist OPTIONAL und zaehlt nie; Core down -> OFFLINE/critical; keine lokale KI -> CRITICAL/critical"),
         "recheck": {"interval_sec": int(cfg.get("recheck_interval_sec") or 45), "order": RECHECK_ORDER,
                     "stale_after_sec": int(cfg.get("stale_after_sec") or 150)},

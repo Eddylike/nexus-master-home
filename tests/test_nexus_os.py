@@ -63,12 +63,11 @@ def test_provider_routing() -> None:
     from nexus.providers.manager import AIProviderManager, LOGICAL_PROVIDERS
 
     mgr = AIProviderManager(default="local")
-    check("routing.logical_slots", set(LOGICAL_PROVIDERS.values()) == {"phone_local", "local", "claude", "openai"}, str(LOGICAL_PROVIDERS))
-    check("routing.resolve_logical", mgr.resolve_key("WOZIPC_LOCAL_AI") == "local" and mgr.resolve_key("PHONE_LOCAL_AI") == "phone_local" and mgr.resolve_key("CHATGPT_OPTIONAL") == "openai")
+    check("routing.logical_slots", set(LOGICAL_PROVIDERS.values()) == {"local", "claude", "openai"}, str(LOGICAL_PROVIDERS))
+    check("routing.resolve_logical", mgr.resolve_key("WOZIPC_LOCAL_AI") == "local" and mgr.resolve_key("CHATGPT_OPTIONAL") == "openai")
 
-    # Phone slot: honest - no fake local phone model, no fabricated reachability
-    pst = mgr.providers["phone_local"].status()
-    check("routing.phone_slot_honest", pst.get("chat_capable") is False and pst.get("reachable") in (True, False), json.dumps(pst)[:160])
+    # Phase-A/phone-local provider control is retired; no synthetic phone provider is registered.
+    check("routing.no_retired_phone_provider", "phone_local" not in mgr.providers and "PHONE_LOCAL_AI" not in LOGICAL_PROVIDERS)
 
     route = mgr.route("guten morgen")
     wozipc = mgr.providers["local"].status()
@@ -93,7 +92,7 @@ def test_shared_room_without_openai() -> None:
     from nexus.chat.shared_room import SharedRoom, normalize_sender, participants
 
     names = [p["name"] for p in participants()]
-    check("room.participants", names == ["EDDY", "NEXUS", "NEXUS OS", "PHONE LOCAL AI", "WOZIPC LOCAL AI", "CHATGPT OPTIONAL"], str(names))
+    check("room.participants", names == ["EDDY", "NEXUS", "HERMES", "NEXUS OS", "PHONE LOCAL AI", "WOZIPC LOCAL AI", "CHATGPT OPTIONAL"], str(names))
     check("room.normalize_alias", normalize_sender("PHONE_LOCAL_AI") == "local_ai" and normalize_sender("wozipc local ai") == "local_ai" and normalize_sender("chatgpt_optional") == "chatgpt")
     check("room.normalize_rejects_unknown", normalize_sender("drop-table") == "drop-table")
 
@@ -115,7 +114,7 @@ def test_shared_room_without_openai() -> None:
     loop = room.append(session_id=sid, sender_type="WOZIPC_LOCAL_AI", sender_name="NEXUS", content="Selbst.", source="test", target="WOZIPC_LOCAL_AI", mode="collaboration")
     check("room.self_routing_guard", loop.get("blocked") in ("same_sender_loop", "invalid_route"), json.dumps(loop)[:140])
 
-    over = room.append(session_id=sid, sender_type="WOZIPC_LOCAL_AI", sender_name="NEXUS", content="Runde 9.", source="test", target="EDDY", round_no=9, mode="collaboration")
+    over = room.append(session_id=sid, sender_type="WOZIPC_LOCAL_AI", sender_name="NEXUS", content="Runde 9.", source="test", target="chatgpt", round_no=9, mode="collaboration")
     check("room.max_rounds_guard", over.get("blocked") == "max_rounds", json.dumps(over)[:140])
     check("room.max_rounds_default_4", room.max_rounds == 4, str(room.max_rounds))
 
@@ -123,34 +122,28 @@ def test_shared_room_without_openai() -> None:
     check("room.status_reports_participants", isinstance(st.get("participants"), list) and st.get("chatgpt_optional_missing_is_ok") is True)
 
 
-# ---------------------------------------------------------------- termux / phone semantics (v2)
-def test_termux_status_semantics() -> None:
+# ---------------------------------------------------------------- Phase-A retired / phone inventory only
+def test_phase_a_retired() -> None:
     from nexus import nexus_os
 
+    # Phase-A control server, ADB forwarding and legacy phone-agent actions are retired.
+    # The handset/Termux package inventory remains read-only and must not control NEXUS.
+    check("phase_a.no_agent_status", not hasattr(nexus_os, "termux_agent_status"))
+    check("phase_a.no_adb_forward", not hasattr(nexus_os, "ensure_adb_forward") and not hasattr(nexus_os, "_forward_list"))
+    source = Path(nexus_os.__file__).read_text(encoding="utf-8")
+    check("phase_a.no_control_ports", "8766" not in source and "18766" not in source and "8765" not in source)
+    check("phase_a.no_legacy_control", "termux_phase_a_control" not in source and "install_phase_a" not in source)
     dev = nexus_os.phone_status()
     state = dev.get("state")
     check("phone.state_known", state in (nexus_os.ONLINE, nexus_os.UNAVAILABLE_TEMPORARILY, nexus_os.UNKNOWN), str(state))
-    agent = nexus_os.termux_agent_status()
-    check("phone_agent.port_8766", agent.get("agent_port") == 8766 and agent.get("forward_port") == 18766, json.dumps(agent)[:160])
-    check("phone_agent.not_chat_capable", agent.get("chat_capable") is False)
-    if state == nexus_os.ONLINE:
-        check("phone.termux_packages", "com.termux" in (dev.get("termux_packages") or []), str(dev.get("termux_packages"))[:160])
-        check("phone_agent.state_honest", agent.get("status") in (nexus_os.ONLINE, nexus_os.OFFLINE, nexus_os.FAILED, nexus_os.UNAVAILABLE_TEMPORARILY, nexus_os.UNKNOWN), json.dumps(agent)[:160])
-        fw1 = nexus_os.ensure_adb_forward()
-        fw2 = nexus_os.ensure_adb_forward()
-        check("adb_forward.idempotent", fw1.get("ok") and fw2.get("ok") and fw2.get("code") == "FORWARD_PRESENT", json.dumps([fw1.get("code"), fw2.get("code")]))
-        check("adb_forward.no_legacy_8765", not any(r == "tcp:8765" for _, _, r in nexus_os._forward_list()), str(nexus_os._forward_list()))
-    else:
-        check("phone_agent.unavailable_when_no_phone", agent.get("status") == nexus_os.UNAVAILABLE_TEMPORARILY, json.dumps(agent)[:160])
-    # clear error messages without touching the real device list
-    nd = nexus_os.ensure_adb_forward(devices={"adb": True, "devices": [], "ready": [], "error": "NO_DEVICE"})
-    check("adb_forward.no_device_message", nd.get("code") == "NO_DEVICE" and "ADB forward to Termux agent failed" in nd.get("message", ""), nd.get("message", ""))
-    ua = nexus_os.ensure_adb_forward(serial="X1", devices={"adb": True, "devices": [{"serial": "X1", "state": "unauthorized"}], "ready": [], "error": "DEVICE_UNAUTHORIZED"})
-    check("adb_forward.unauthorized_message", ua.get("code") == "DEVICE_UNAUTHORIZED" and "autorisiert" in ua.get("message", ""), ua.get("message", ""))
+    check("phone.read_only_inventory", "termux" in dev and "termux_packages" in dev)
 
 
 # ---------------------------------------------------------------- system status (v2 rules)
 def _cycle_with(nexus_os, **patches):
+    # MOBILE 20261109: rule tests simulate "phone gone" - a paired-app contact recorded by another
+    # test in the same process must not leak in, unless a test injects one explicitly.
+    patches.setdefault("_paired_app_link", lambda getter=None: None)
     saved = {k: getattr(nexus_os, k) for k in patches}
     try:
         for k, v in patches.items():
@@ -170,7 +163,7 @@ def test_system_status() -> None:
     check("status.all_display_rows", all(k in comps for k in nexus_os.DISPLAY_ORDER), ",".join(sorted(comps)))
     check("status.source_and_checked_at", all(c.get("source") and c.get("checked_at") for c in comps.values()),
           json.dumps({k: [bool(v.get("source")), bool(v.get("checked_at"))] for k, v in comps.items()})[:200])
-    layer_keys = ["CORE", "WOZIPC", "WOZIPC_LOCAL_AI", "NEXUSPHONE", "TERMUX", "PHONE_AGENT", "PHONE_LOCAL_AI", "GLOBAL_LOCAL_AI", "SHARED_ROOM", "VOICE", "BRIDGE", "CHATGPT"]
+    layer_keys = ["CORE", "WOZIPC", "WOZIPC_LOCAL_AI", "NEXUSPHONE", "TERMUX", "PHONE_LOCAL_AI", "GLOBAL_LOCAL_AI", "SHARED_ROOM", "VOICE", "BRIDGE", "CHATGPT"]
     check("status.component_vocab", all(comps[k]["status"] in nexus_os.COMPONENT_STATES for k in layer_keys),
           json.dumps({k: comps[k]["status"] for k in layer_keys}))
     check("status.health_vocab", data.get("SYSTEM_HEALTH") in (nexus_os.HEALTHY, nexus_os.DEGRADED, nexus_os.CRITICAL, nexus_os.OFFLINE), str(data.get("SYSTEM_HEALTH")))
@@ -186,27 +179,27 @@ def test_system_status() -> None:
     special = {"OPERATING_MODE", "ACTIVE_AI_PROVIDER", "SYSTEM_HEALTH", "CRITICAL_FAILURE"}
     check("status.state_vocab", all(v.get("state") in nexus_os.STATES for k, v in comps.items() if k not in special),
           json.dumps({k: v.get("state") for k, v in comps.items() if k not in special}))
-    check("status.phone_tri_state", all(comps[k]["state"] in (nexus_os.ONLINE, nexus_os.OFFLINE, nexus_os.UNKNOWN) for k in ("TERMUX", "PHONE_AGENT", "PHONE_CONTROL")),
-          json.dumps({k: comps[k]["state"] for k in ("TERMUX", "PHONE_AGENT", "PHONE_CONTROL")}))
+    check("status.termux_inventory_tri_state", comps["TERMUX"]["state"] in (nexus_os.ONLINE, nexus_os.OFFLINE, nexus_os.UNKNOWN),
+          json.dumps({"TERMUX": comps["TERMUX"]["state"]}))
     check("status.device_not_unavailable_if_online", comps["PHONE_DEVICE"]["state"] != nexus_os.ONLINE or comps["PHONE_DEVICE"]["state"] == comps["NEXUSPHONE"]["state"])
     check("status.nexus_operational", data.get("NEXUS_OPERATIONAL") == bool(data.get("CORE_OPERATIONAL") and not data.get("CRITICAL_FAILURE")))
     wa = comps["WOZIPC_LOCAL_AI"]
-    check("status.wozipc_online_needs_inference", wa["status"] != nexus_os.ONLINE or isinstance(wa.get("inference_ms"), int), json.dumps({k: wa.get(k) for k in ("status", "inference_ms", "inference_checked_at", "reason")}))
+    check("status.wozipc_online_has_model_evidence", wa["status"] != nexus_os.ONLINE or (wa.get("model_loaded") is True and bool(wa.get("inference_checked_at"))), json.dumps({k: wa.get(k) for k in ("status", "model_loaded", "inference_ms", "inference_checked_at", "reason")}))
     if wa["status"] == nexus_os.ONLINE and data.get("CORE_OPERATIONAL"):
         check("status.core_wozipc_link_online", links.get("CORE_WOZIPC", {}).get("state") == nexus_os.ONLINE)
     ph = comps["NEXUSPHONE"]
-    check("status.phone_method", ph.get("method") in ("adb", "tailscale_ping", "none")
-          and (ph["status"] != nexus_os.ONLINE or ph.get("method") in ("adb", "tailscale_ping"))
+    check("status.phone_method", ph.get("method") in ("adb", "tailscale_ping", "app_link", "none")
+          and (ph["status"] != nexus_os.ONLINE or ph.get("method") in ("adb", "tailscale_ping", "app_link"))
           and (ph.get("method") != "tailscale_ping" or (ph.get("tailscale_ping") or {}).get("ok") is True),
           json.dumps({k: ph.get(k) for k in ("status", "method", "reason", "source")}))
     if data.get("CORE_OPERATIONAL"):
         sr = comps["SHARED_ROOM"]
-        check("status.room_roundtrip", "/api/shared-room/message" in sr.get("source", "") and sr["status"] == nexus_os.ONLINE, json.dumps(sr)[:200])
+        check("status.room_roundtrip", "SharedRoom.append" in sr.get("source", "") and ".status" in sr.get("source", "") and sr["status"] == nexus_os.ONLINE, json.dumps(sr)[:200])
     if comps["WOZIPC_LOCAL_AI"]["status"] == nexus_os.ONLINE:
         check("status.global_ai_online_with_pc_ai", comps["GLOBAL_LOCAL_AI"]["status"] == nexus_os.ONLINE)
     if comps["NEXUSPHONE"]["status"] != nexus_os.ONLINE:
         pla = comps["PHONE_LOCAL_AI"]
-        check("status.phone_ai_not_red_when_disconnected", pla["status"] == nexus_os.UNAVAILABLE_TEMPORARILY and pla.get("reason") and pla.get("dependency"), json.dumps(pla)[:160])
+        check("status.phone_ai_unknown_when_disconnected", pla["status"] == nexus_os.UNKNOWN and pla.get("reason") and pla.get("dependency"), json.dumps(pla)[:160])
     blob = json.dumps(data)
     secrets = [v for v in (os.environ.get("OPENAI_API_KEY"), os.environ.get("NEXUS_BRIDGE_TOKEN")) if v and len(v) >= 8]
     check("status.no_secret_leak", not any(v in blob for v in secrets) and "sk-" not in blob, f"checked {len(secrets)} env secrets (values not printed)")
@@ -219,12 +212,14 @@ def test_system_status() -> None:
         check("rule.pc_fallback", d1["OPERATING_MODE"] == "PC_FALLBACK" and d1["SYSTEM_HEALTH"] == nexus_os.DEGRADED and d1["CRITICAL_FAILURE"] is False
               and d1["ACTIVE_AI_PROVIDER"] == "WOZIPC_LOCAL_AI" and d1["GLOBAL_LOCAL_AI"] == nexus_os.ONLINE,
               json.dumps({k: d1[k] for k in ("OPERATING_MODE", "SYSTEM_HEALTH", "CRITICAL_FAILURE", "ACTIVE_AI_PROVIDER", "GLOBAL_LOCAL_AI")}))
-        check("rule.phone_disconnected_reason", c1["NEXUSPHONE"]["status"] == nexus_os.DISCONNECTED and c1["PHONE_LOCAL_AI"].get("reason") == "DEVICE_DISCONNECTED"
-              and c1["PHONE_LOCAL_AI"].get("dependency") == "NEXUSPHONE", json.dumps(c1["PHONE_LOCAL_AI"])[:160])
+        check("rule.phone_ai_stale_is_unknown", c1["NEXUSPHONE"]["status"] == nexus_os.DISCONNECTED
+              and c1["PHONE_LOCAL_AI"]["status"] == nexus_os.UNKNOWN
+              and c1["PHONE_LOCAL_AI"].get("reason") == "HEARTBEAT_STALE",
+              json.dumps({"phone": c1["NEXUSPHONE"], "phone_ai": c1["PHONE_LOCAL_AI"]})[:220])
         check("rule.pc_fallback_ok_true", d1.get("ok") is True and d1.get("health") == nexus_os.DEGRADED, json.dumps({k: d1.get(k) for k in ("ok", "health")}))
     # Rule: Tailscale peer flag online but no pong -> not ONLINE (TAILSCALE_ONLY)
     fake_ts = {"available": True, "running": True, "data": {"Peer": {"x": {"HostName": "fake", "DNSName": "fake.ts.net.",
-               "TailscaleIPs": [nexus_os.load_config().get("phone_tailscale_ip") or "192.0.2.12"], "Online": True, "Active": False, "OS": "android"}}}}
+               "TailscaleIPs": [nexus_os.load_config().get("phone_tailscale_ip") or "192.0.2.11"], "Online": True, "Active": False, "OS": "android"}}}}
     no_pong = lambda target, cfg=None, force=False: {"ok": False, "error": "NO_PONG", "source": "test tailscale ping", "checked_at": nexus_os._iso(), "method": "tailscale_ping"}
     pong = lambda target, cfg=None, force=False: {"ok": True, "latency_ms": 12.0, "via": "test", "source": "test tailscale ping", "checked_at": nexus_os._iso(), "method": "tailscale_ping"}
     d4 = _cycle_with(nexus_os, adb_devices=no_dev, _tailscale_status=lambda: fake_ts, tailscale_ping=no_pong)
@@ -235,7 +230,7 @@ def test_system_status() -> None:
     check("rule.tailscale_ping_online", p5["status"] == nexus_os.ONLINE and p5.get("method") == "tailscale_ping" and d5["components"]["TERMUX"]["status"] == nexus_os.UNKNOWN,
           json.dumps({k: p5.get(k) for k in ("status", "reason", "method")}))
     # Rule: cached pong must be dropped as soon as the peer flag goes offline (live result + checked_at shown)
-    ip_cfg = nexus_os.load_config().get("phone_tailscale_ip") or "192.0.2.12"
+    ip_cfg = nexus_os.load_config().get("phone_tailscale_ip") or "192.0.2.11"
     fake_off = {"available": True, "running": True, "data": {"Peer": {"x": {"HostName": "fake", "DNSName": "fake.ts.net.",
                 "TailscaleIPs": [ip_cfg], "Online": False, "Active": False, "OS": "android"}}}}
     saved_ping, saved_prev = nexus_os._STATE.get("ts_ping"), nexus_os._STATE.get("peer_online_prev")
@@ -252,12 +247,12 @@ def test_system_status() -> None:
               and "pong 71" not in str(p6.get("detail")) and "kein pong" in str(p6.get("detail")) and bool(p6.get("checked_at")),
               json.dumps({"force": seen.get("force"), "status": p6.get("status"), "detail": p6.get("detail"), "checked_at": p6.get("checked_at")})[:220])
         # real function: force=True bypasses a cached pong
-        nexus_os._STATE["ts_ping"] = {"ok": True, "latency_ms": 71.0, "via": "stale", "target": "192.0.2.13", "ts": time.time(), "checked_at": nexus_os._iso()}
+        nexus_os._STATE["ts_ping"] = {"ok": True, "latency_ms": 71.0, "via": "stale", "target": "192.0.2.16", "ts": time.time(), "checked_at": nexus_os._iso()}
         old_exe = nexus_os._TAILSCALE_EXE
         nexus_os._TAILSCALE_EXE = r"C:\nexus-os-test\missing-tailscale.exe"
         try:
-            r_cached = nexus_os.tailscale_ping("192.0.2.13")
-            r_live = nexus_os.tailscale_ping("192.0.2.13", force=True)
+            r_cached = nexus_os.tailscale_ping("192.0.2.16")
+            r_live = nexus_os.tailscale_ping("192.0.2.16", force=True)
         finally:
             nexus_os._TAILSCALE_EXE = old_exe
         check("rule.ping_force_bypasses_cache", r_cached.get("cached") is True and r_live.get("cached") is False and r_live.get("ok") is not True,
@@ -320,7 +315,7 @@ def main() -> int:
     test_identity()
     test_provider_routing()
     test_shared_room_without_openai()
-    test_termux_status_semantics()
+    test_phase_a_retired()
     test_system_status()
     test_live_endpoints()
     passed = sum(1 for _, ok, _ in RESULTS if ok)

@@ -934,3 +934,30 @@ body.nx-app.nx-desktop-bg .msg.user .bubble{
 }
 .files-list .mem-item .mem-id,.files-list .skill-item .skill-area{color:var(--cyan);font-size:11px}
 .files-list .skill-item .skill-via{color:var(--muted);font-size:11px}
+
+/* Skill- & Prompt-Bibliothek */
+#libraryCategories button.active{
+  border-color:var(--cyan);
+  box-shadow:0 0 0 1px rgba(34,211,238,.35);
+}
+.files-list .library-item{
+  padding:12px;border-radius:10px;border:1px solid var(--border);
+  background:rgba(255,255,255,.03);margin-bottom:8px;font-size:13px;line-height:1.45;
+}
+.library-item-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.library-item-head strong{color:var(--gold2);font-size:14px}
+.library-badge{color:var(--cyan);font-size:11px;letter-spacing:.03em;white-space:nowrap}
+.files-list .library-item p{margin:6px 0}
+.library-tags{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0}
+.library-tag{
+  border:1px solid var(--border);background:transparent;color:var(--muted);
+  border-radius:999px;padding:1px 9px;font-size:11px;cursor:pointer;
+}
+.library-tag:hover{border-color:var(--cyan);color:var(--cyan)}
+.library-item details{margin-top:6px}
+.library-item summary{cursor:pointer;color:var(--cyan);font-size:12px}
+.library-prompt{
+  margin:8px 0 0;padding:10px;border-radius:8px;border:1px solid var(--border);
+  background:rgba(0,0,0,.25);color:var(--fg);white-space:pre-wrap;word-break:break-word;
+  font:12px/1.45 Consolas,"Cascadia Mono",monospace;max-height:260px;overflow:auto;
+}

@@ -50,6 +50,13 @@ def probe(get=_get) -> dict:
     except Exception as e:
         c["ollama"] = {"ok": False, "error": type(e).__name__}
     if c["core"]["ok"]:
+        try:  # Deep Health: Erreichbarkeit != Funktionsfaehigkeit; degraded loest keinen Neustart aus
+            dh, _ = get(BASE + "/api/health/deep", 5)
+            c["deep"] = {"ok": dh.get("status") in ("healthy", "degraded"),
+                         "status": dh.get("status"), "functional_verified": bool(dh.get("functional_verified")),
+                         "reachable_agents": dh.get("reachable_agents") or []}
+        except Exception as e:
+            c["deep"] = {"ok": False, "error": type(e).__name__}
         try:
             hh, _ = get(BASE + "/api/hermes/health")
             c["hermes"] = {"ok": bool(hh.get("cli_probe") == "path_exists" or hh.get("execution_verified")), "busy": hh.get("busy")}

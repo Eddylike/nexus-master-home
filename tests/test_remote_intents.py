@@ -158,7 +158,7 @@ def test_untrusted_model_output_cannot_widen_actions(proposal):
     assert "intent" not in interpret("Bitte erledige die unbekannte Aktion", engine(FakeLocal(proposal)))
 
 
-@pytest.mark.parametrize("url", ["https://api.openai.com", "http://192.0.2.10:11434", "http://127.0.0.1.evil.test", "file:///tmp/model"])
+@pytest.mark.parametrize("url", ["https://api.openai.com", "http://192.168.1.3:11434", "http://127.0.0.1.evil.test", "file:///tmp/model"])
 def test_nonlocal_provider_is_never_called(url):
     llm = FakeLocal({"intent": "media.next", "args": {}, "question": None})
     llm.base_url = url

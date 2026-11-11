@@ -40,6 +40,7 @@
     folder: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5Z"/>',
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6.5 8.5 7 8.5-7"/>',
     nexusall: '<rect x="2" y="4" width="20" height="14" rx="2"/><path d="m10 8 5 3-5 3z"/><path d="M12 18v3m-3-2 3 2 3-2"/>',
+    library: '<path d="M12 6C10 4 7 4 4 5v14c3-1 6-1 8 1 2-2 5-2 8-1V5c-3-1-6-1-8 1Z"/><path d="M12 6v14"/>',
     studio: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m4 17 5-5 3 3 3-3 5 5"/><path d="M18 2v3m-1.5-1.5h3"/>',
     more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'
   };
@@ -345,11 +346,12 @@
     }
 
     [
-      ["whatsapp", "WhatsApp Business öffnen", "whatsapp", osOpen("/api/os/launch_app", { name: "whatsapp" }), [1.3, 15.6, 17.5, 15.4], "WhatsApp Business"],
+      ["whatsapp", "WhatsApp Business öffnen", "whatsapp", osOpen("/api/os/launch_app", { name: "whatsapp" }), [1.3, 15.6, 17.5, 15.4], "WhatsApp"],
       ["facebook", "Facebook öffnen", "facebook", osOpen("/api/os/open_url", { url: "https://www.facebook.com/" }), [1.3, 32.4, 17.5, 15.4], "Facebook"],
       ["youtube", "YouTube öffnen", "youtube", osOpen("/api/os/open_url", { url: "https://www.youtube.com/" }), [1.3, 49.2, 17.5, 15.4], "YouTube"],
       ["studio", "NEXUS Studio öffnen", "studio", () => window.open("/studio", "_blank"), [1.3, 66, 17.5, 15.4], "NEXUS Studio"],
-      ["nexusall", "NEXUS All öffnen: Browser, Videoplayer und Downloader", "nexusall", () => window.open("/nexusall", "_blank"), [1.3, 84, 97.8, 9.5], "NEXUS All · Browser · Player · Downloader"],
+      ["library", "Skill- & Prompt-Bibliothek öffnen", "library", () => navigate("library"), [80.6, 63.2, 18.5, 17.0], "Skill- & Prompt-Bibliothek"],
+      ["nexusall", "NEXUS All öffnen: Browser, Videoplayer und Downloader", "nexusall", () => window.open("/nexusall", "_blank"), [1.3, 84, 97.8, 9.5], "NEXUS All"],
       ["files", "Dateien im Explorer öffnen (G:\\)", "folder", osOpen("/api/os/open_path", { path: "G:\\", folder: true }), [80.6, 15.6, 18.5, 20.5], "Dateien"],
       ["mail", "E-Mail öffnen (Outlook, sonst Gmail)", "mail", osOpen("/api/os/launch_app", { name: "outlook" }), [80.6, 38.2, 18.5, 22.2], "E-Mail"]
     ].forEach(([id, label, image, action, bounds, name]) => {

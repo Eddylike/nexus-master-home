@@ -39,29 +39,15 @@ ORIGINAL = (
 )
 
 
-def _phone_health(*, online=True, models=None):
-    return {
-        "status": "PASS", "service": "NEXUS_PHASE_A_CONTROL", "pid": 123,
-        "version": "test-1", "code_sha256": "a" * 64, "actions": ["health"],
-        "local_ai": {"status": "ONLINE" if online else "OFFLINE",
-                     "reason": None if online else "NO_LOCAL_AI_SERVICE",
-                     "detail": "ollama 127.0.0.1:11434 am Handy",
-                     "models": ["qwen3:1.7b"] if models is None else models},
-    }
-
-
 def _plan(text=ORIGINAL):
     out = plan_local_work(text)
     out["request"] = text
     return out
 
 
-def _phone_records(health=None, state="device"):
-    return [
-        {"task": "android_devices", "result": {"adb": True, "returncode": 0,
-         "stdout": "List of devices attached\n249ac5d7\t" + state + " product:redmi\n", "stderr": ""}},
-        {"task": "termux_phase_a_control", "result": health or _phone_health()},
-    ]
+def _phone_records(state="device"):
+    return [{"task": "android_devices", "result": {"adb": True, "returncode": 0,
+             "stdout": "List of devices attached\n249ac5d7\t" + state + " product:redmi\n", "stderr": ""}}]
 
 
 class LocalPlanningTests(unittest.TestCase):
@@ -70,17 +56,14 @@ class LocalPlanningTests(unittest.TestCase):
         plan = _plan()
         self.assertFalse(plan["requires_web"])
         self.assertEqual(plan["device"], "249ac5d7")
-        self.assertEqual([s["action"] for s in plan["steps"]],
-                         ["android_devices", "termux_phase_a_control"])
-        self.assertEqual(plan["steps"][1]["params"], {"device": "249ac5d7", "action": "health"})
+        self.assertEqual([s["action"] for s in plan["steps"]], ["android_devices"])
 
     def test_plan_never_expands_to_uncontrolled_execution(self):
         plan = _plan(ORIGINAL + "\nShell cmd PowerShell python_run_project_script delete_file git_push root.")
         for step in plan["steps"]:
             self.assertIn(step["action"], TASK_PERMISSIONS)
             self.assertNotEqual(TASK_PERMISSIONS[step["action"]], PermissionLevel.PRIVILEGED)
-        self.assertEqual({s["action"] for s in plan["steps"]},
-                         {"android_devices", "termux_phase_a_control"})
+        self.assertEqual({s["action"] for s in plan["steps"]}, {"android_devices"})
 
     def test_explanation_and_negated_work_are_not_execution_authorization(self):
         for text in ("Was ist Qwen3?", "Wie integriere ich Ollama?", "Erkläre die ADB-Schnittstelle.",
@@ -103,16 +86,10 @@ class LocalPlanningTests(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(is_local_work(text))
 
-    def test_qwen_minor_family_and_variant_match_exactly(self):
+    def test_phone_ai_is_unknown_without_a_fresh_app_heartbeat(self):
         plan = _plan("Prüfe Qwen3.5-0.8B auf dem Handy. ADB-Gerät `249ac5d7` verwenden.")
-        self.assertEqual(capability_gaps(plan, _phone_records(_phone_health(models=["qwen3.5:0.8b"]))), [])
-        for wrong_model in ("qwen3:0.8b", "qwen3.5:4b", "qwen3.50:0.8b", "other-qwen3.5:0.8b"):
-            with self.subTest(model=wrong_model):
-                gaps = capability_gaps(plan, _phone_records(_phone_health(models=[wrong_model])))
-                self.assertEqual(gaps[0]["code"], "QWEN3_MODEL_NOT_FOUND")
-        base = _plan("Prüfe Qwen3 auf dem Handy. ADB-Gerät `249ac5d7` verwenden.")
-        gaps = capability_gaps(base, _phone_records(_phone_health(models=["qwen3.5:0.8b"])))
-        self.assertEqual(gaps[0]["code"], "QWEN3_MODEL_NOT_FOUND")
+        gaps = capability_gaps(plan, _phone_records())
+        self.assertEqual(gaps[0]["code"], "PHONE_LOCAL_AI_UNVERIFIED")
 
     def test_unknown_task_contract_never_claims_a_keyword_proves_unavailability(self):
         for text in ("unabhängig vom PC und Internet", "ohne Browser", "online", "Browser"):
@@ -130,22 +107,14 @@ class LocalPlanningTests(unittest.TestCase):
         nexus.assert_not_called()
 
     def test_phone_offline_is_exact_local_gap_even_when_pc_could_be_online(self):
-        gaps = capability_gaps(_plan(), _phone_records(_phone_health(online=False)))
-        self.assertEqual(gaps[0]["code"], "NO_LOCAL_AI_SERVICE")
+        gaps = capability_gaps(_plan(), _phone_records())
+        self.assertEqual(gaps[0]["code"], "PHONE_LOCAL_AI_UNVERIFIED")
         self.assertIn("Handy", gaps[0]["detail"])
         self.assertNotIn("Browser", gaps[0]["detail"])
 
-    def test_missing_qwen_and_unknown_phone_ai_are_not_ready(self):
-        gaps = capability_gaps(_plan(), _phone_records(_phone_health(models=["llama3:8b"])))
-        self.assertEqual(gaps[0]["code"], "QWEN3_MODEL_NOT_FOUND")
-        health = _phone_health()
-        del health["local_ai"]
-        gaps = capability_gaps(_plan(), _phone_records(health))
+    def test_phone_inventory_does_not_claim_a_model_or_ai_readiness(self):
+        gaps = capability_gaps(_plan(), _phone_records())
         self.assertEqual(gaps[0]["code"], "PHONE_LOCAL_AI_UNVERIFIED")
-
-    def test_requested_model_variant_must_match(self):
-        gaps = capability_gaps(_plan(), _phone_records(_phone_health(models=["qwen3:4b"])))
-        self.assertEqual(gaps[0]["code"], "QWEN3_MODEL_NOT_FOUND")
 
     def test_wrong_or_unauthorized_device_is_a_device_gap(self):
         gaps = capability_gaps(_plan(), _phone_records(state="unauthorized"))
@@ -157,8 +126,8 @@ class LocalPlanningTests(unittest.TestCase):
 
     def test_successful_probes_never_claim_full_integration(self):
         gaps = capability_gaps(_plan(), _phone_records())
-        self.assertEqual(gaps[0]["code"], "LOCAL_INTEGRATION_CONTRACT_REQUIRED")
-        self.assertIn("Backups", gaps[0]["detail"])
+        self.assertEqual(gaps[0]["code"], "PHONE_LOCAL_AI_UNVERIFIED")
+        self.assertIn("Heartbeat", gaps[0]["detail"])
 
     def test_model_inventory_cannot_prove_chat_or_offline_operation(self):
         for text in ("Prüfe den Offlinebetrieb von Qwen3 auf dem PC.", "Prüfe, ob Qwen3 im Chat antwortet."):
@@ -172,23 +141,6 @@ class LocalPlanningTests(unittest.TestCase):
         self.assertIsNone(plan["device"])
         self.assertEqual([s["action"] for s in plan["steps"]], ["android_devices"])
         self.assertEqual(capability_gaps(plan, _phone_records())[0]["code"], "ADB_TARGET_REQUIRED")
-
-
-class HealthObservationContractTests(unittest.TestCase):
-    def test_offline_ai_is_valid_health_observation_but_not_model_readiness(self):
-        health = _phone_health(online=False)
-        outcome = evaluate("termux_phase_a_control", {"action": "health", "device": "249ac5d7"}, health)
-        self.assertEqual(outcome.status, "succeeded")
-        self.assertEqual(capability_gaps(_plan(), _phone_records(health))[0]["code"], "NO_LOCAL_AI_SERVICE")
-
-    def test_wrong_health_service_is_not_verified(self):
-        health = _phone_health()
-        health["service"] = "unrelated-service"
-        self.assertNotEqual(evaluate("termux_phase_a_control", {"action": "health"}, health).status, "succeeded")
-
-    def test_other_remote_actions_remain_unverified(self):
-        for action in ("chat_e2e", "install_package", "restart_control", "file_status"):
-            self.assertNotEqual(evaluate("termux_phase_a_control", {"action": action}, _phone_health()).status, "succeeded")
 
 
 class LocalExecutionReceiptTests(unittest.TestCase):
@@ -218,10 +170,8 @@ class LocalExecutionReceiptTests(unittest.TestCase):
         self.stack.enter_context(patch.object(evidence, "persisted_task",
                                              side_effect=lambda task_id: actual_persisted(task_id, root=self.root)))
         self.calls = []
-        self.health = _phone_health()
         self.models = ["qwen3:1.7b"]
         self.manager.register("android_devices", self._devices)
-        self.manager.register("termux_phase_a_control", self._health)
         self.manager.register("llm_status", self._llm)
         self.session = {"id": "local-test-session"}
         self.master = SimpleNamespace(_persist_chat_order=lambda: None)
@@ -229,10 +179,6 @@ class LocalExecutionReceiptTests(unittest.TestCase):
     def _devices(self, params, record):
         self.calls.append((record.task, dict(params)))
         return _phone_records()[0]["result"]
-
-    def _health(self, params, record):
-        self.calls.append((record.task, dict(params)))
-        return self.health
 
     def _llm(self, params, record):
         self.calls.append((record.task, dict(params)))
@@ -252,25 +198,22 @@ class LocalExecutionReceiptTests(unittest.TestCase):
         self.assertEqual(receipt["status"], "succeeded")
         self.assertEqual(len(list((self.root / "workspace/state").glob("local-work-*.json"))), 1)
 
-    def test_original_runs_registered_phone_checks_and_stops_at_real_local_gap(self):
-        self.health = _phone_health(online=False)
+    def test_original_runs_only_registered_phone_inventory_and_reports_ai_unknown(self):
         out = evidence.route_work(self.master, ORIGINAL, [], self.session)
         self.assertEqual(out["status"], "PARTIAL")
-        self.assertEqual(out["error"], "NO_LOCAL_AI_SERVICE")
-        self.assertEqual(self.calls, [("android_devices", {}),
-                                    ("termux_phase_a_control", {"device": "249ac5d7", "action": "health"})])
-        self.assertEqual(len(out["data"]["task_ids"]), 2)
+        self.assertEqual(out["error"], "PHONE_LOCAL_AI_UNVERIFIED")
+        self.assertEqual(self.calls, [("android_devices", {})])
+        self.assertEqual(len(out["data"]["task_ids"]), 1)
         self.assertNotIn("Web-/Browserzugriff", out["reply"])
-        for task_id in out["data"]["task_ids"]:
-            self.assertEqual(self.manager.get(task_id).status, "succeeded")
+        self.assertEqual(self.manager.get(out["data"]["task_ids"][0]).status, "succeeded")
 
-    def test_read_only_process_still_blocks_safe_write_device_action(self):
+    def test_read_only_process_allows_phone_inventory_but_not_ai_claim(self):
         with patch.dict(os.environ, {"NEXUS_BRIDGE_PROCESS_LEVEL": "READ_ONLY"}):
             out = evidence.route_work(self.master, ORIGINAL, [], self.session)
-        self.assertFalse(out["success"])
-        self.assertNotEqual(out["status"], "PASS")
+        self.assertTrue(out["success"] is False)
+        self.assertEqual(out["status"], "PARTIAL")
         self.assertEqual(self.calls, [("android_devices", {})])
-        self.assertIn("SAFE_WRITE", out["reply"])
+        self.assertIn("PHONE_LOCAL_AI_UNVERIFIED", out["reply"])
         self.assertEqual(len(out["data"]["task_ids"]), 1)
 
     def test_registered_action_without_executor_has_specific_error_and_order_id(self):
@@ -292,7 +235,7 @@ class LocalExecutionReceiptTests(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
     def test_unsupported_endpoint_names_exact_contract_gap_without_execution(self):
-        for endpoint in ("192.0.2.10:11434", "http://127.0.0.1:11435", "http://localhost:22434",
+        for endpoint in ("192.168.1.15:11434", "http://127.0.0.1:11435", "http://localhost:22434",
                          "https://example.invalid:11434"):
             with self.subTest(endpoint=endpoint):
                 out = evidence.route_work(self.master, "Prüfe Qwen3 unter " + endpoint + " auf dem PC.", [], self.session)
@@ -302,10 +245,11 @@ class LocalExecutionReceiptTests(unittest.TestCase):
                 self.assertEqual(self.calls, [])
                 self.assertNotIn("Web-/Browserzugriff", out["reply"])
 
-    def test_privileged_deployment_cannot_enter_automatic_plan(self):
+    def test_retired_phase_a_deployment_is_not_registered(self):
+        self.assertNotIn("deploy_phase_a_control", TASK_PERMISSIONS)
         orchestrator = importlib.import_module("nexus.tasks.orchestrator").Orchestrator()
-        with self.assertRaisesRegex(ValueError, "PRIVILEGED.*approval"):
-            orchestrator.create("forbidden implicit deployment", [
+        with self.assertRaisesRegex(ValueError, "unknown registered action"):
+            orchestrator.create("retired Phase-A deployment", [
                 {"action": "deploy_phase_a_control", "params": {"device": "249ac5d7"}}
             ])
         self.assertEqual(self.calls, [])
@@ -373,22 +317,6 @@ class LocalExecutionReceiptTests(unittest.TestCase):
                 self.assertEqual(self.calls, [])
                 self.assertEqual(self.manager.list(), [])
 
-    def test_legacy_unknown_health_reports_observed_phone_gap_without_pass(self):
-        self.health = _phone_health(online=False)
-
-        def legacy_evaluate(task, params, data):
-            if task == "termux_phase_a_control":
-                return ExecutorOutcome(data, "verification_unknown", "legacy health completion contract unavailable")
-            return evaluate(task, params, data)
-
-        with patch("nexus.bridge.tasks.evaluate", side_effect=legacy_evaluate):
-            out = evidence.route_work(self.master, ORIGINAL, [], self.session)
-        self.assertFalse(out["success"])
-        self.assertEqual(out["status"], "PARTIAL")
-        self.assertEqual(out["error"], "NO_LOCAL_AI_SERVICE")
-        self.assertEqual([r["status"] for r in out["data"]["tools"]], ["succeeded", "failed"])
-        self.assertIn("VERIFICATION_UNKNOWN", [g["code"] for g in out["data"]["capability_gaps"]])
-        self.assertNotIn("Web-/Browserzugriff", out["reply"])
 
 
 if __name__ == "__main__":

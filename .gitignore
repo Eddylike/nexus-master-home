@@ -23,3 +23,5 @@ conversations.json
 *.mp3
 *.wav
 .pytest_cache/
+*.backup*
+*.BACKUP*

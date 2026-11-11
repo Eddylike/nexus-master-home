@@ -21,10 +21,21 @@ REPAIR_INTENT = re.compile(
     r"\b(reparier\w*|repair\w*|beheb\w*|behob\w*|korrigier\w*|(?:ä|ae)nder\w*|fix\w*|bugfix\w*|beseitig\w*)\b", re.I)
 PATH_RE = re.compile(r"(?<![\w.\-])((?:[A-Za-z]:)?[\w./\\:-]*[\w-]+\.[A-Za-z][A-Za-z0-9]{0,5})\b", re.I)
 ALLOWED_SUFFIX = {".py"}
+# Schreibbare Reparaturbereiche. Die Projektgrenze selbst bleibt ROOT; alles ausserhalb
+# wird in resolve() weiterhin als OUTSIDE_PROJECT abgelehnt. Pfade innerhalb des Projekts,
+# die hier nicht genannt sind, werden als PATH_NOT_WRITABLE (nicht als "ausserhalb")
+# gemeldet. nexus/games/ ist fuer die Spielfixierung freigegeben.
+WRITE_ALLOWLIST = ("workspace/", "nexus/integrations/", "nexus/games/")
 
 
 def _sha(p: Path) -> str:
     return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def write_allowed(rel: str) -> bool:
+    """True, wenn der projektrelative Pfad in einem freigegebenen Schreibbereich liegt."""
+    posix = str(rel).replace("\\", "/").lstrip("/")
+    return any(posix == prefix.rstrip("/") or posix.startswith(prefix) for prefix in WRITE_ALLOWLIST)
 
 
 def named_paths(text: str) -> list[str]:
@@ -32,13 +43,19 @@ def named_paths(text: str) -> list[str]:
 
 
 def resolve(raw: str):
-    """-> (Path|None, fehlercode|None). Nur Dateien innerhalb ROOT, keine Traversal."""
-    s = raw.strip().strip('"\'')
+    """-> (Path|None, fehlercode|None). Nur Dateien innerhalb ROOT, keine Traversal.
+
+    Normalisierung: Backslashes werden vereinheitlicht, leere und '.'-Segmente entfernt,
+    Laufwerkspfade bleiben absolut. Die Projektgrenze ist ROOT.resolve(); ein gueltiger
+    projektinterner Pfad darf hier niemals als OUTSIDE_PROJECT enden.
+    """
+    s = (raw or "").strip().strip('"\'')
     norm = s.replace("\\", "/")
-    if ".." in norm.split("/"):
+    parts = [p for p in norm.split("/") if p not in ("", ".")]
+    if any(p == ".." for p in parts):
         return None, "PATH_TRAVERSAL"
-    p = Path(s)
-    p = p if p.is_absolute() or re.match(r"^[A-Za-z]:", s) else ROOT / norm
+    is_abs = norm.startswith("/") or bool(re.match(r"^[A-Za-z]:", norm))
+    p = Path(norm) if is_abs else ROOT.joinpath(*parts)
     try:
         rp = p.resolve()
     except Exception:
@@ -70,6 +87,8 @@ def _refuse(code: str, raw: str) -> dict:
         "FILE_NOT_FOUND": "existiert nicht",
         "TYPE_NOT_SUPPORTED": "ist kein unterstuetzter Dateityp (nur .py)",
         "PATH_INVALID": "ist kein gueltiger Pfad",
+        "PATH_NOT_WRITABLE": "liegt im Projekt, aber nicht in einem freigegebenen Schreibbereich "
+                             "(workspace/, nexus/integrations/, nexus/games/)",
     }
     detail = f"Reparatur abgelehnt: '{raw}' {texts.get(code, code)}. Es wurde nichts geschrieben."
     return {"success": False, "intent": "repair", "status": "REFUSED", "error": "REPAIR_" + code,
@@ -138,9 +157,8 @@ def run(master, text: str, session: dict | None = None) -> dict:
     if err:
         return _refuse(err, raw)
     rel = target.relative_to(ROOT).as_posix()
-    allowed = rel.startswith("workspace/") or rel.startswith("nexus/integrations/")
-    if not allowed:
-        return _refuse("OUTSIDE_PROJECT", raw)
+    if not write_allowed(rel):
+        return _refuse("PATH_NOT_WRITABLE", raw)
     stamp = time.strftime("%Y%m%d-%H%M%S")
     original = target.read_bytes()
     hash_before = hashlib.sha256(original).hexdigest()

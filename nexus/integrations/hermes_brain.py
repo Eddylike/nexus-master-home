@@ -766,6 +766,10 @@ class HermesBrain:
                                      "bytes": len(content.encode("utf-8")), "create_task_id": None,
                                      "read_task_id": read.get("task_id"), "equal": True, "reused": True})
                 continue
+            if (read.get("error_code") or read.get("error")) not in ("NOT_FOUND", "FILE_NOT_FOUND"):
+                task_ids.append(read.get("task_id"))
+                return result("BLOCKED", read.get("error_code") or read.get("error") or "READ_FAILED",
+                              task_ids, verification)
             created = invoke({"operation": "submit", "task": "create_file", "params": requirement})
             if not (created.get("success") is True and created.get("task_readback_verified")
                     and created.get("execution_instance_verified")):

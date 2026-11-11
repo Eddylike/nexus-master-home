@@ -103,6 +103,18 @@ def geocode(place: str, hint: str = "") -> dict | None:
     return None
 
 
+def day_offset(text: str) -> tuple[int, str]:
+    """0 = heute, 1 = morgen, 2 = uebermorgen (nur aus dem Wortlaut, nichts geraten)."""
+    t = str(text or "").lower()
+    for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+        t = t.replace(a, b)
+    if re.search(r"\buebermorgen\b", t):
+        return 2, "Übermorgen"
+    if re.search(r"\bmorgen\b", t):
+        return 1, "Morgen"
+    return 0, "Heute"
+
+
 def weather(text: str, default_place: str | None = None) -> dict:
     place = place_of(text) or default_place
     if not place:
@@ -117,26 +129,48 @@ def weather(text: str, default_place: str | None = None) -> dict:
         return {"success": True, "place": place, "found": False, "source": "open-meteo geocoding",
                 "spoken": f"Den Ort {place} finde ich beim Wetterdienst nicht. Nenn mir bitte eine Stadt in der Nähe."}
     try:
+        offset, label = day_offset(text)
+        days = max(1, offset + 1)
         w = _get(FORECAST, {"latitude": geo["latitude"], "longitude": geo["longitude"], "timezone": "auto",
-                            "forecast_days": 1,
+                            "forecast_days": days,
                             "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation",
-                            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max"})
+                            "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code"})
     except Exception as exc:
         return {"success": False, "error": "FORECAST_" + type(exc).__name__,
                 "spoken": "Ich komme gerade nicht an den Wetterdienst."}
     cur, day = w.get("current") or {}, w.get("daily") or {}
 
+    def nth(k, i=0):
+        v = day.get(k) or []
+        return v[i] if i < len(v) else None
+
     def first(k):
-        v = day.get(k) or [None]
-        return v[0]
+        return nth(k, 0)
+
     name = geo.get("name") + (f" ({geo['admin1']})" if geo.get("admin1") and geo.get("country_code") == "DE" else "")
+    if offset > 0:
+        tmax, tmin = nth("temperature_2m_max", offset), nth("temperature_2m_min", offset)
+        code, precip = nth("weather_code", offset), nth("precipitation_probability_max", offset)
+        if tmax is None:
+            spoken = f"Fuer {label.lower()} habe ich in {name} gerade keine Prognose bekommen."
+        else:
+            desc = WMO.get(code, "unbekannte Wetterlage")
+            spoken = f"{label} wird es in {name} {desc}, zwischen {round(tmin) if tmin is not None else '?'} und {round(tmax)} Grad"
+            if precip is not None:
+                spoken += f", Regenrisiko {precip} Prozent"
+            spoken += "."
+        return {"success": True, "found": True, "place": name, "spoken": spoken, "source": "open-meteo.com",
+                "day": label, "offset": offset,
+                "data": {"tmax": tmax, "tmin": tmin, "code": code, "precip": precip,
+                         "lat": geo["latitude"], "lon": geo["longitude"]}}
     desc = WMO.get(cur.get("weather_code"), "unbekannte Wetterlage")
-    t, feels = cur.get("temperature_2m"), cur.get("apparent_temperature")
-    parts = [f"In {name} ist es gerade {desc} bei {round(t)} Grad"
-             + (f", gefühlt {round(feels)}" if feels is not None and abs(feels - t) >= 2 else "") + "."]
+    tcur, feels = cur.get("temperature_2m"), cur.get("apparent_temperature")
+    parts = [f"In {name} ist es gerade {desc} bei {round(tcur)} Grad"
+             + (f", gefuehlt {round(feels)}" if feels is not None and abs(feels - tcur) >= 2 else "") + "."]
     if first("temperature_2m_max") is not None:
         parts.append(f"Heute zwischen {round(first('temperature_2m_min'))} und {round(first('temperature_2m_max'))} Grad"
                      + (f", Regenrisiko {first('precipitation_probability_max')} Prozent" if first("precipitation_probability_max") is not None else "") + ".")
     return {"success": True, "found": True, "place": name, "spoken": " ".join(parts), "source": "open-meteo.com",
-            "data": {"time": cur.get("time"), "temperature": t, "apparent": feels, "code": cur.get("weather_code"),
+            "day": label, "offset": 0,
+            "data": {"time": cur.get("time"), "temperature": tcur, "apparent": feels, "code": cur.get("weather_code"),
                      "wind_kmh": cur.get("wind_speed_10m"), "lat": geo["latitude"], "lon": geo["longitude"]}}

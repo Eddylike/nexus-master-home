@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>NEXUS · Chat</title>
-<link rel="icon" href="data:,">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cdefs%3E%3ClinearGradient id=%27g%27 x1=%270%27 y1=%270%27 x2=%271%27 y2=%271%27%3E%3Cstop offset=%270%27 stop-color=%27%233b82f6%27/%3E%3Cstop offset=%27.5%27 stop-color=%27%235eead4%27/%3E%3Cstop offset=%271%27 stop-color=%27%23c084fc%27/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%230a0d18%27/%3E%3Cpath d=%27M9 23V9l14 14V9%27 fill=%27none%27 stroke=%27url(%23g)%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/css/nexus.css?v=dedupe20261102"/>
 <link rel="stylesheet" href="/static/css/space_base.css?v=dedupe20261102"/>
 <link rel="stylesheet" href="/static/css/master_home.css?v=dedupe20261102"/>
@@ -12,9 +12,9 @@
 <link rel="stylesheet" href="/static/css/nexus_music.css?v=dedupe20261102"/>
 <link rel="stylesheet" href="/static/css/phase2_room.css?v=dedupe20261102"/>
 <link rel="stylesheet" href="/static/css/master_redesign.css?v=dedupe20261102"/>
-<link rel="stylesheet" href="/static/css/master_reference.css?v=dedupe20261102"/>
+<link rel="stylesheet" href="/static/css/master_reference.css?v=20261106-layout1"/>
 <link rel="stylesheet" href="/static/css/no_avatar.css?v=uiwork61"/>
-<link rel="stylesheet" href="/static/css/nexus4d.css?v=uiwork61"/><link rel="stylesheet" href="/static/css/nexus4d_dark.css?v=uiwork61"/>
+<link rel="stylesheet" href="/static/css/nexus4d.css?v=bb1111"/><link rel="stylesheet" href="/static/css/nexus4d_dark.css?v=bb1111"/><link rel="stylesheet" href="/static/css/nexus4d_mh4d.css?v=bb1111"/><link rel="stylesheet" href="/static/css/think_panel.css?v=bb1111"/><link rel="stylesheet" href="/static/css/nexus4d_glass.css?v=bb1111"/>
 </head>
     <body id="nxBody" class="nx-app nx-4d">
 <!-- 20261102 NEXUS 4D: Hell/Dunkel-Schalter entfernt, dunkel ist Standard (Backup: G:\meine-ki\backups\ui_4d_redesign_20261102) -->
@@ -48,6 +48,7 @@
             <nav class="nav" id="sideNav">
         <button type="button" data-view="chat" class="active">Chat</button>
         <button type="button" data-view="crew">Agenten</button>
+        <button type="button" data-view="library">Skill- &amp; Prompt-Bibliothek</button>
         <button type="button" data-view="files">Dateien</button>
         <button type="button" data-view="skills">Skills</button>
         <button type="button" data-view="memory">Memory</button>
@@ -63,7 +64,8 @@
         <button type="button" data-view="videos">Videos</button>
         <button type="button" data-view="galerie">Galerie</button>
         <button type="button" onclick="window.open('/studio','_blank')">Studio</button>
-        <button type="button" onclick="window.open('/swarm','_blank')">Swarm</button>
+        <button type="button" id="btnSwarmPanel" aria-expanded="false" aria-controls="nxSwarmPanel" title="Swarm in Master Home einbetten">Swarm</button>
+        <button type="button" onclick="window.open('/kommando','_blank')">Kommando</button>
         <button type="button" data-view="maps">Maps</button>
         <button type="button" data-view="streams">Streams</button>
         <button type="button" data-view="downloads">Downloads</button>
@@ -110,6 +112,7 @@
       <button type="button" class="icon-btn" id="btnToggleRight" title="Kontext" aria-label="Kontext">ℹ</button>
     </header>
 
+    <div id="nxSwarmPanel" class="hide" role="region" aria-label="NEXUS Swarm eingebettet"><div class="nx-livehub-bar"><strong class="nx-livehub-title">SWARM</strong><button type="button" id="btnSwarmPanelClose" aria-label="Swarm einklappen" title="Einklappen">&#8211;</button></div><iframe id="nxSwarmFrame" title="NEXUS Swarm" loading="lazy"></iframe></div>
     <div id="nxLiveHub" class="hide" role="region" aria-label="Live-Hub NEXUS HERMES NEXUS GPT"><div class="nx-livehub-bar"><strong class="nx-livehub-title">LIVE-HUB</strong><span class="nx-livehub-tabs" role="tablist"><button type="button" role="tab" data-ag="all" class="on">Alle</button><button type="button" role="tab" data-ag="NEXUS">NEXUS</button><button type="button" role="tab" data-ag="Hermes,Hermes-PS">HERMES</button><button type="button" role="tab" data-ag="NEXUS-GPT">NEXUS GPT</button></span><button type="button" id="btnLiveHubClose" aria-label="Live-Hub einklappen" title="Einklappen">&#8211;</button></div><iframe id="nxLiveHubFrame" title="Live-Monitor" loading="lazy"></iframe></div>
     <div id="nxThread">
       <section class="nx-ai-room" id="nxAiRoom" aria-label="Zentraler KI-Chatraum">
@@ -560,6 +563,33 @@
         </div>
       </div>
 
+      <div class="panel float-panel workspace-panel" id="libraryPanel">
+        <div class="panel-head">
+          <h3>Skill- &amp; Prompt-Bibliothek</h3>
+          <button type="button" class="icon-btn" id="btnCloseLibrary" title="Schließen">×</button>
+        </div>
+        <div class="body">
+          <p class="streams-note">Lokale NEXUS-Starterbibliothek · 6 Kategorien · 18 Einträge. Nach Kategorie und Tag filtern, Prompt ansehen und direkt in den Chat übernehmen. Skills sind verkettete Pipeline-Schritte und führen ohne dein Zutun keine externen Aktionen aus.</p>
+          <div class="streams-actions">
+            <input id="libraryTag" type="search" placeholder="Tag filtern (z. B. business)" aria-label="Bibliothek nach Tag filtern"/>
+            <button type="button" class="primary" id="btnLibraryRefresh">Aktualisieren</button>
+          </div>
+          <div class="home-hub-grid" id="libraryCategories">
+            <button type="button" data-library-category="schreiben">✍️ Schreiben <small>Texte, E-Mails, Kommunikation</small></button>
+            <button type="button" data-library-category="code">⌨️ Code <small>Entwicklung und Fehleranalyse</small></button>
+            <button type="button" data-library-category="analyse">📊 Analyse <small>Strukturieren und auswerten</small></button>
+            <button type="button" data-library-category="kreativ">🎨 Kreativ <small>Ideen und Gestaltung</small></button>
+            <button type="button" data-library-category="business">💼 Business <small>Planung und Geschäft</small></button>
+            <button type="button" data-library-category="lernen">📚 Lernen <small>Erklären und Wissen</small></button>
+          </div>
+          <div id="libraryList" class="files-list"><span class="muted">—</span></div>
+          <div class="streams-actions" style="margin-top:12px">
+            <button type="button" id="btnLibraryOpenRoot">Bibliotheksdateien öffnen</button>
+            <span class="streams-note" id="libraryStatus">Quelle: skills/ · Starterbibliothek v1.0</span>
+          </div>
+        </div>
+      </div>
+
       <div class="panel float-panel workspace-panel" id="skillsPanel">
         <div class="panel-head">
           <h3>Skills</h3>
@@ -650,8 +680,8 @@
 <audio id="nxTts" preload="none"></audio>
 <script id="nxStableJs">/* Pruef-Hilfe: misst erst, wenn das Layout 4x250 ms unveraendert ist (max 9 s) */
 window.__nxStableLoad=function(fn0){var fn=function(){try{fn0()}finally{setTimeout(function(){window.__nxRelease&&window.__nxRelease()},50)}};function sig(){var a=[document.body?document.body.scrollHeight:0,innerWidth,innerHeight,document.getElementsByTagName("*").length,document.documentElement.clientWidth,document.documentElement.scrollHeight];["nxComposer","nxLiveHub","nxTerminal","nxReferenceStage","nxThread","nxInput","nxReferenceCard-whatsapp","nxReferenceCard-files"].forEach(function(i){var e=document.getElementById(i);if(e){var r=e.getBoundingClientRect();a.push(Math.round(r.top),Math.round(r.bottom),Math.round(r.left),Math.round(r.right))}});return a.join(",")}
-function subsDone(){/* alle Skripte, Styles und iframes (ausser dem Halte-Frame) sind fertig geladen */var n=document.querySelectorAll("script[src],link[rel=stylesheet][href],iframe[src]:not(#nxHold)");for(var k=0;k<n.length;k++){var u=n[k].src||n[k].href;if(u&&/^https?:/.test(u)&&!performance.getEntriesByName(u).length)return false}return true}function noAnim(){/* keine endliche CSS-Animation/Transition laeuft mehr (Endlos-Effekte zaehlen nicht) */if(!document.getAnimations)return true;var l=document.getAnimations();for(var k=0;k<l.length;k++){var an=l[k],e=an.effect,ti=e&&e.getComputedTiming?e.getComputedTiming():null;if(an.playState==="running"&&ti&&isFinite(ti.endTime))return false}return true}function go(){var last=null,same=0,t0=Date.now();(function tick(){var s=sig();same=(s===last&&(!document.fonts||document.fonts.status==="loaded")&&subsDone()&&noAnim())?same+1:0;last=s;if(same>=6||Date.now()-t0>12000){fn()}else setTimeout(tick,250)})()}
-function start(){go()}if(document.readyState==="complete")setTimeout(start,0);else if(document.readyState==="interactive")setTimeout(start,0);else document.addEventListener("DOMContentLoaded",start)};/* Nur im Pruefmodus: ein haengender Bild-Request haelt das load-Event (und damit --dump-dom) auf, bis gemessen wurde */if(/[?&](domcheck|gridcheck|termcheck|n4check|n4r13|n4send|n4light|n4contrast|n4pseudo|n4apps|n4layout)=1/.test(location.search)){document.addEventListener("DOMContentLoaded",function(){var h=document.createElement("iframe");h.id="nxHold";h.setAttribute("aria-hidden","true");h.tabIndex=-1;h.style.cssText="position:absolute;width:0;height:0;border:0;visibility:hidden";h.src="/api/terminal/stream?hold="+Date.now();window.__nxHold=h;document.body.appendChild(h)})}window.__nxRelease=function(){var h=window.__nxHold;if(h){window.__nxHold=null;if(h.parentNode)h.parentNode.removeChild(h)}};</script>
+function subsDone(){/* alle Skripte, Styles und iframes (ausser dem Halte-Frame) sind fertig geladen */var n=document.querySelectorAll("script[src],link[rel=stylesheet][href],iframe[src]:not(#nxHold)");for(var k=0;k<n.length;k++){var u=n[k].src||n[k].href;if(u&&/^https?:/.test(u)&&!performance.getEntriesByName(u).length)return false}return true}function noAnim(){/* keine endliche CSS-Animation/Transition laeuft mehr (Endlos-Effekte zaehlen nicht) */if(!document.getAnimations)return true;var l=document.getAnimations();for(var k=0;k<l.length;k++){var an=l[k],e=an.effect,ti=e&&e.getComputedTiming?e.getComputedTiming():null;if(an.playState==="running"&&ti&&isFinite(ti.endTime))return false}return true}function nxReady(){/* MH4D 2026-11-10: erst messen, wenn 4D-Layout + master_glass-Szene fertig sind (sonst Messung im Vorab-Layout) */var B=document.body,h=document.getElementById("nxLiveHub");if(!B||!B.classList.contains("nx-4d"))return false;return !h||!!(h.parentNode&&h.parentNode.id==="nxReferenceScene")}function go(){var last=null,same=0,t0=Date.now();(function tick(){var s=sig();same=(s===last&&(!document.fonts||document.fonts.status==="loaded")&&subsDone()&&noAnim()&&nxReady())?same+1:0;last=s;if(same>=6||Date.now()-t0>12000){fn()}else setTimeout(tick,250)})()}
+function start(){go()}if(document.readyState==="complete")setTimeout(start,0);else if(document.readyState==="interactive")setTimeout(start,0);else document.addEventListener("DOMContentLoaded",start)};/* Nur im Pruefmodus: ein haengender Bild-Request haelt das load-Event (und damit --dump-dom) auf, bis gemessen wurde */if(/[?&](domcheck|gridcheck|termcheck|n4check|n4r13|n4send|n4light|n4contrast|n4pseudo|n4apps|n4layout|thinkcheck)=1/.test(location.search)){document.addEventListener("DOMContentLoaded",function(){var h=document.createElement("iframe");h.id="nxHold";h.setAttribute("aria-hidden","true");h.tabIndex=-1;h.style.cssText="position:absolute;width:0;height:0;border:0;visibility:hidden";h.src="/api/terminal/stream?hold="+Date.now();window.__nxHold=h;document.body.appendChild(h)})}window.__nxRelease=function(){var h=window.__nxHold;if(h){window.__nxHold=null;if(h.parentNode)h.parentNode.removeChild(h)}};</script>
 <script src="/static/js/space_fx.js?v=dedupe20261102"></script>
 <script src="/static/js/desktop_bg.js?v=dedupe20261102"></script>
 <dialog id="masterOrders" aria-labelledby="masterHeading">
@@ -682,15 +712,17 @@ function start(){go()}if(document.readyState==="complete")setTimeout(start,0);el
 <script src="/static/js/phase2_room.js?v=uiwork61"></script>
 <script src="/static/js/chat_pipeline.js?v=uiwork61"></script>
 <script src="/static/js/nx_md.js?v=dedupe20261102"></script>
-<script src="/static/js/app.js?v=uiwork61"></script>
+<script src="/static/js/app.js?v=mh4d3"></script>
+<script src="/static/js/library_panel.js?v=20261106b"></script>
 <script src="/static/js/nexus_music.js?v=dedupe20261102"></script>
 <script src="/static/js/bridge_status_tiles.js?v=dedupe20261102"></script>
 <script src="/static/js/hermes_status_step5.js?v=dedupe20261102"></script>
 <script src="/static/js/hermes_allmode.js?v=dedupe20261102"></script>
 <script src="/static/js/hermes_tasks_step6.js?v=dedupe20261102"></script>
-<script src="/static/js/master_glass.js?v=uiwork61"></script>
-<script src="/static/js/nexus4d.js?v=uiwork61"></script>
-<script id="nxGlassRetry">/* 20261102 Nexus-UI: falls master_glass.js nicht geladen hat (Netzwackler), einmal nachladen */(function(){function chk(){if(window.__nxGlassRetried||document.getElementById("nxReferenceScene")||window.NEXUS_GLASS)return;window.__nxGlassRetried=1;var s=document.createElement("script");s.src="/static/js/master_glass.js?v=uiwork61&retry="+Date.now();document.body.appendChild(s);if(document.body)document.body.dataset.glassRetry="1"}setTimeout(chk,2500);window.addEventListener("load",function(){setTimeout(chk,300)})})();</script>
+<script src="/static/js/master_glass.js?v=20261106-layout1"></script>
+<script src="/static/js/nexus4d.js?v=bb1111"></script>
+<script src="/static/js/think_panel.js?v=think1"></script><script src="/static/js/glass_theme.js?v=glass1"></script><script src="/static/js/mh4d_fixes.js?v=mh4d3"></script>
+<script id="nxGlassRetry">/* 20261102 Nexus-UI: falls master_glass.js nicht geladen hat (Netzwackler), einmal nachladen */(function(){function chk(){if(window.__nxGlassRetried||document.getElementById("nxReferenceScene")||window.NEXUS_GLASS)return;window.__nxGlassRetried=1;var s=document.createElement("script");s.src="/static/js/master_glass.js?v=20261106-layout1&retry="+Date.now();document.body.appendChild(s);if(document.body)document.body.dataset.glassRetry="1"}setTimeout(chk,2500);window.addEventListener("load",function(){setTimeout(chk,300)})})();</script>
 <style id="nxLiveHubCss">
 #btnLiveHub{margin-right:10px;padding:4px 12px;border-radius:999px;border:1px solid rgba(137,207,240,.7);background:rgba(255,255,255,.85);color:#0b3d5c;font-weight:700;cursor:pointer}
 #btnLiveHub[aria-expanded="true"]{background:#89cff0;color:#04263a}
@@ -720,7 +752,7 @@ body.nx-app.nx-reference .nx-reference-app-state{color:#5a7590!important;text-sh
 body.nx-app.nx-reference #nxReferenceScene > #nxLiveHub{grid-area:6/2/7/5;position:relative;margin:0;display:flex;flex-direction:column;pointer-events:auto;z-index:2}
 body.nx-app.nx-reference #nxReferenceScene > #nxLiveHub.hide{display:none}
 body.nx-app.nx-reference #nxLiveHub .nx-livehub-bar{display:flex;align-items:center;gap:.5vw;padding:.8vh .7vw;background:linear-gradient(90deg,#f4fafe,#e6f3fb);border-bottom:1px solid #d5e2ec}
-body.nx-app.nx-reference #nxLiveHubFrame{flex:1 1 auto;height:auto;min-height:0;background:#fbfdff}
+body.nx-app.nx-reference #nxLiveHubFrame{flex:1 1 auto;height:auto;min-height:0;background:#0a0d18}
 }
 .nx-livehub-title{letter-spacing:.08em;font-size:12px;color:#0b3d5c}
 .nx-livehub-tabs{display:flex;gap:4px;flex:1 1 auto;flex-wrap:wrap}
@@ -731,8 +763,8 @@ body.nx-app.nx-reference #nxLiveHubFrame{flex:1 1 auto;height:auto;min-height:0;
 </style>
 <script id="nxLiveHubJs">
 (function(){var b=document.getElementById("btnLiveHub"),p=document.getElementById("nxLiveHub"),f=document.getElementById("nxLiveHubFrame"),c=document.getElementById("btnLiveHubClose");if(!b||!p||!f)return;
-function set(o,u){if(u){try{localStorage.setItem("nxLiveHub",o?"1":"0")}catch(e){}}p.classList.toggle("hide",!o);b.setAttribute("aria-expanded",o?"true":"false");if(o){if(!f.getAttribute("src"))f.setAttribute("src","/live_monitor.html");}else{f.removeAttribute("src");}}
-var mq=window.matchMedia("(min-width:1660px) and (min-height:560px)"),home=p.parentNode,anchor=document.getElementById("nxThread");function place(){var sc=document.getElementById("nxReferenceScene");if(sc){var t=sc;if(p.parentNode!==t)t.appendChild(p);}else if(p.parentNode!==home){home.insertBefore(p,anchor);}}place();document.addEventListener("DOMContentLoaded",function(){setTimeout(place,0);});window.addEventListener("load",place);var curAg="all";function theme(){try{var d=f.contentDocument;if(!d||!d.head||d.getElementById("nxHubTheme"))return;var s=d.createElement("style");s.id="nxHubTheme";s.textContent="body{background:#fbfdff!important;color:#1d3446!important;font:12.5px/1.45 Segoe UI,system-ui,sans-serif!important}header{display:none!important}#log{padding:6px 10px!important}.e{border-bottom:1px solid #e3edf5!important;padding:3px 0!important}.t,.d{color:#7a8ea0!important}.d{margin-left:0!important}.k{color:#5a7590!important}.a{color:#fff!important}";d.head.appendChild(s);}catch(e){}}function filt(){try{var d=f.contentDocument;if(!d)return;var want=curAg==="all"?null:curAg.split(",");d.querySelectorAll("#flt label").forEach(function(l){var a=l.querySelector(".a"),i=l.querySelector("input");if(!a||!i)return;var on=!want||want.indexOf(a.textContent.trim())>=0;if(i.checked!==on){i.checked=on;i.dispatchEvent(new Event("change"));}});}catch(e){}}f.addEventListener("load",function(){theme();setTimeout(filt,300);});p.querySelectorAll(".nx-livehub-tabs button").forEach(function(t){t.addEventListener("click",function(){curAg=t.dataset.ag;p.querySelectorAll(".nx-livehub-tabs button").forEach(function(x){x.classList.toggle("on",x===t);x.setAttribute("aria-selected",x===t?"true":"false");});filt();});});if(mq.addEventListener)mq.addEventListener("change",place);window.nxLiveHub=set;b.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();set(p.classList.contains("hide"),1);});
+function set(o,u){if(u){try{localStorage.setItem("nxLiveHub",o?"1":"0")}catch(e){}}p.classList.toggle("hide",!o);b.setAttribute("aria-expanded",o?"true":"false");if(o){if(!f.getAttribute("src"))f.setAttribute("src","/live_monitor.html?v=bb1111");}else{f.removeAttribute("src");}}
+var mq=window.matchMedia("(min-width:1660px) and (min-height:560px)"),home=p.parentNode,anchor=document.getElementById("nxThread");function place(){var sc=document.getElementById("nxReferenceScene");if(sc){var t=sc;if(p.parentNode!==t)t.appendChild(p);}else if(p.parentNode!==home){home.insertBefore(p,anchor);}}place();document.addEventListener("DOMContentLoaded",function(){setTimeout(place,0);});window.addEventListener("load",place);var curAg="all";function theme(){try{var d=f.contentDocument;if(!d||!d.head||d.getElementById("nxHubTheme"))return;var s=d.createElement("style");s.id="nxHubTheme";s.textContent="header{display:none!important}";d.head.appendChild(s);}catch(e){}}function filt(){try{var d=f.contentDocument;if(!d)return;var want=curAg==="all"?null:curAg.split(",");d.querySelectorAll("#flt label").forEach(function(l){var a=l.querySelector(".a"),i=l.querySelector("input");if(!a||!i)return;var on=!want||want.indexOf(a.textContent.trim())>=0;if(i.checked!==on){i.checked=on;i.dispatchEvent(new Event("change"));}});}catch(e){}}f.addEventListener("load",function(){theme();setTimeout(filt,300);});p.querySelectorAll(".nx-livehub-tabs button").forEach(function(t){t.addEventListener("click",function(){curAg=t.dataset.ag;p.querySelectorAll(".nx-livehub-tabs button").forEach(function(x){x.classList.toggle("on",x===t);x.setAttribute("aria-selected",x===t?"true":"false");});filt();});});if(mq.addEventListener)mq.addEventListener("change",place);window.nxLiveHub=set;b.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();set(p.classList.contains("hide"),1);});
 if(c)c.addEventListener("click",function(){set(false,1);});
 var _ls=null;try{_ls=localStorage.getItem("nxLiveHub")}catch(e){}if(/[?&]livehub=1/.test(location.search)||_ls!=="0")set(true);
 if(/[?&]domcheck=1/.test(location.search))__nxStableLoad(function(){function r(e){if(!e)return null;var x=e.getBoundingClientRect();return{t:x.top,b:x.bottom,l:x.left,r:x.right,h:x.height}}var hub=r(p),cp=r(document.getElementById("nxComposer")),inp=document.getElementById("nxInput"),ov=false;if(inp){var q=inp.getBoundingClientRect(),hit=document.elementFromPoint(q.left+q.width/2,q.top+q.height/2);ov=!(hit&&hit.closest&&hit.closest("#nxComposer"));}var th=document.getElementById("nxThread"),inThread=!!(th&&th.contains(p)),t0=hub?hub.t:null;if(th){th.scrollTop=th.scrollHeight;}var t1=r(p);var R={};["nxApp","nxChat","nxSide","nxTop","nxThread","nxReferenceScene","nxReferenceStage","nxReferenceCard-youtube","nxReferenceCard-mail","nxReferenceCard-facebook","nxReferenceCard-studio","nxReferenceCard-health","nxReferenceOuterCards","nxReferenceEcosystem","nxReferenceTab-pc","nxReferenceTab-security","nxReferenceCard-whatsapp","nxReferenceCard-files","nxReferenceCard-nexusall","nxReferenceLiveHealth"].forEach(function(i){R[i]=r(document.getElementById(i))});var o={parent:p.parentNode&&(p.parentNode.id||p.parentNode.tagName),reference:document.body.classList.contains("nx-reference")&&mq.matches,rects:R,vw:innerWidth,vh:innerHeight,in_thread:inThread,top_before:t0,top_after:t1?t1.t:null,thread_scrollable:th?th.scrollHeight>th.clientHeight:null,open:!p.classList.contains("hide"),src:f.getAttribute("src")||"",expanded:b.getAttribute("aria-expanded"),hub:hub,composer:cp,overlap_composer:ov,input_visible:!!(inp&&inp.offsetParent),same_page:location.pathname};var pre=document.createElement("pre");pre.id="domcheck";pre.style.display="none";pre.textContent=JSON.stringify(o);document.body.appendChild(pre);});})();
@@ -824,7 +856,8 @@ body.nx-app.nx-reference #nxReferenceScene{grid-template-rows:2vh minmax(0,1fr) 
 body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-whatsapp{grid-area:2/2/3/3!important}body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-facebook{grid-area:2/4/3/5!important}
 body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-youtube{grid-area:4/2/5/3!important}body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-studio{grid-area:4/4/5/5!important}
 body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-files{grid-area:6/2/7/3!important}body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-mail{grid-area:6/4/7/5!important}
-body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-zocker{grid-area:8/2/9/5!important}
+body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-zocker{grid-area:8/2/9/4!important}
+body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-library{grid-area:8/4/9/5!important}
 body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-nexusall{grid-area:10/2/11/11!important}
 body.nx-app.nx-reference #nxReferenceScene > #nxLiveHub{grid-area:2/8/9/11!important}
 body.nx-app.nx-reference #nxReferenceStage{top:2vh!important;height:86.4vh!important}
@@ -844,6 +877,8 @@ body.nx-app.nx-reference #nxReferenceScene > #nxLiveHub{grid-area:5/1/6/3!import
 body.nx-app.nx-reference #nxReferenceScene > #nxLiveHub.hide{display:none!important}
 body.nx-app.nx-reference #nxReferenceScene > #nxLiveHub #nxLiveHubFrame{flex:1 1 auto;min-height:0;height:auto}
 body.nx-app.nx-reference #nxReferenceScene .nx-reference-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-zocker{grid-area:4/1/5/2!important}
+body.nx-app.nx-reference #nxReferenceScene #nxReferenceCard-library{grid-area:4/2/5/3!important}
 }
 /* 20261102 Nexus-UI: Hub auch unter 1660px rechts (wie bei 1920), Kacheln links */
 @media not all and (min-width:1660px) and (min-height:560px){
@@ -875,5 +910,26 @@ var tiles=["whatsapp","facebook","youtube","files","mail","studio","nexusall"].f
 var pre=document.createElement("pre");pre.id="nxGridResult";pre.textContent="GRIDCHECK "+JSON.stringify({R:["nxReferenceScene","nxReferenceCard-whatsapp","nxReferenceCard-studio","nxReferenceCard-files","nxLiveHub","nxReferenceCard-nexusall"].map(function(i){var e=document.getElementById(i);if(!e)return i+":-";var r=e.getBoundingClientRect();return i+":"+[r.left,r.top,r.width,r.height].map(Math.round).join(",")+":"+getComputedStyle(e).zoom}),w:innerWidth,h:innerHeight,tiles:tiles,checked:P.length,overlap:ov,dupLabels:d,livehubInScene:!!(document.getElementById("nxReferenceScene")||{contains:function(){return false}}).contains(document.getElementById("nxLiveHub"))});document.body.appendChild(pre);window.__nxRelease&&window.__nxRelease()},1200);
 })();
 </script>
+
+<style id="nxSwarmEmbedCss">
+#btnSwarmPanel{margin-right:10px;padding:4px 12px;border-radius:999px;border:1px solid rgba(137,207,240,.7);background:rgba(255,255,255,.85);color:#0b3d5c;font-weight:700;cursor:pointer}
+#btnSwarmPanel[aria-expanded="true"]{background:#89cff0;color:#04263a}
+#nxSwarmPanel{flex:0 0 auto;position:relative;z-index:2;margin:6px 12px;border:1px solid rgba(137,207,240,.6);border-radius:14px;overflow:hidden;background:rgba(255,255,255,.9);box-shadow:0 6px 24px rgba(0,40,80,.18)}
+#nxSwarmPanel.hide{display:none}
+#nxSwarmFrame{display:block;width:100%;height:min(40vh,360px);border:0;background:#0d1117}
+</style>
+<script id="nxSwarmEmbedJs">
+(function(){
+  var b=document.getElementById("btnSwarmPanel"), p=document.getElementById("nxSwarmPanel"),
+      f=document.getElementById("nxSwarmFrame"), c=document.getElementById("btnSwarmPanelClose");
+  if(!b||!p||!f) return;
+  function set(o){p.classList.toggle("hide",!o);b.setAttribute("aria-expanded",o?"true":"false");
+    if(o){if(!f.getAttribute("src")) f.setAttribute("src","/swarm");}
+    else {f.removeAttribute("src");}}
+  b.addEventListener("click", function(e){e.preventDefault(); set(p.classList.contains("hide"));});
+  if(c) c.addEventListener("click", function(){set(false);});
+})();
+</script>
+
 </body>
 </html>

@@ -12,8 +12,11 @@ _INFERENCE_LOCK = threading.RLock()
 def _unified_ctx() -> int:
     try:
         from nexus.common import ai_layer
-        return ai_layer.unified_num_ctx()
+        ctx = ai_layer.unified_num_ctx()
+        # Sicherstellung: Qwen 3.5 9B wird mindestens so groes Kontextfenster zuweisen wie die Alternative, um Entladen zu verhindern
+        return max(ctx, 4096)
     except Exception:
+        # Fallback auf eine minimale sichere Groesse, keine automatische Reduktion auf 8192 bei Fehlern, die unter 3.5 9B fallen
         return 8192
 
 
@@ -44,7 +47,31 @@ from .config import Config
 PREFERRED_MODELS = ("qwen3.5:9b", "qwen3.5:4b", "llama3.2:latest", "llama3.2", "llama3")
 def _think():
     # 2026-10-26: qwen3.5 denkt sonst standardmaessig und verbraucht num_predict komplett -> leere Antwort ('Keine Antwort.').
+    # THINK-01 2026-11-10: pro Anfrage gesetzter Override (Denkprozess-Fenster) hat Vorrang.
+    try:
+        from nexus.common import think_panel as _tp
+        _ov = _tp.current_override()
+        if _ov is not None:
+            return bool(_ov)
+    except Exception:
+        pass
     return os.environ.get("NEXUS_OLLAMA_THINK", "0") == "1"
+
+
+def _think_budget() -> int:
+    try:
+        from nexus.common.think_panel import THINK_NUM_PREDICT
+        return int(THINK_NUM_PREDICT)
+    except Exception:
+        return 2048
+
+
+def _new_splitter():
+    try:
+        from nexus.common.think_panel import ThinkTagSplitter
+        return ThinkTagSplitter()
+    except Exception:
+        return None
 
 
 DEFAULT_CHAT_OPTIONS = {"num_ctx": 8192, "num_predict": 320, "temperature": 0.35}
@@ -187,6 +214,8 @@ class OllamaClient:
             opts["num_predict"] = int(num_predict)
         if format:
             payload["format"] = format
+        if payload["think"]:  # THINK-01: Denken braucht eigenes Token-Budget
+            opts["num_predict"] = max(int(opts.get("num_predict") or 0), _think_budget())
         t0 = time.monotonic()
         ok, data = self._req("POST", "/api/chat", payload)
         wall_ms = int((time.monotonic() - t0) * 1000)
@@ -194,13 +223,21 @@ class OllamaClient:
             return {"success": False, "reply": f"Ollama-Fehler: {data.get('error', 'unbekannt')}", "error": data.get("error"), "model": model}
         msg = data.get("message") or {}
         reply = (msg.get("content") or data.get("response") or "").strip()
+        thinking = str(msg.get("thinking") or "")
+        try:  # THINK-03: <think>-Tags aus der Antwort in den Denkprozess verschieben
+            from nexus.common.think_panel import split_think_tags
+            _tt, reply = split_think_tags(reply)
+            if _tt:
+                thinking = (thinking + "\n" + _tt).strip()
+        except Exception:
+            pass
         ns = lambda k: int((data.get(k) or 0) / 1e6)
         # Phasenzeiten (für Latenzanalyse): wall = inkl. Warten auf _INFERENCE_LOCK; Rest kommt von Ollama.
         timings = {"wall_ms": wall_ms, "ollama_total_ms": ns("total_duration"), "load_ms": ns("load_duration"),
                    "prompt_ms": ns("prompt_eval_duration"), "eval_ms": ns("eval_duration"),
                    "prompt_tokens": data.get("prompt_eval_count"), "eval_tokens": data.get("eval_count")}
         timings["queue_ms"] = max(0, wall_ms - timings["ollama_total_ms"])
-        return {"success": True, "reply": reply, "model": model, "message": msg,
+        return {"success": True, "reply": reply, "model": model, "message": msg, "thinking": thinking,
                 "tool_calls": msg.get("tool_calls") or [], "raw": {"done": data.get("done")}, "timings": timings}
 
     def chat(self, messages: list[dict], *, model: str | None = None, temperature: float = 0.3, tools: list[dict] | None = None,
@@ -266,6 +303,10 @@ class OllamaClient:
             "options": opts,
             "keep_alive": self._effective_keep_alive(),
         }
+        if payload["think"]:  # THINK-01
+            opts["num_predict"] = max(int(opts.get("num_predict") or 0), _think_budget())
+        _tsplit = _new_splitter()
+        thinking_parts: list[str] = []
         url = f"{self.base_url}/api/chat"
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
@@ -307,6 +348,7 @@ class OllamaClient:
                                         "model": retry.get("model"),
                                         "success": bool(retry.get("success")),
                                         "error": retry.get("error"),
+                                        "thinking": retry.get("thinking") or "",
                                         "fallback_from": use,
                                         "fallback_reason": "memory_pressure",
                                     }
@@ -314,10 +356,19 @@ class OllamaClient:
                             pass
                         return
                     msg = obj.get("message") or {}
+                    _th = msg.get("thinking") or ""
+                    if _th:  # THINK-02: Denk-Tokens getrennt vom Inhalt streamen
+                        thinking_parts.append(_th)
+                        yield {"type": "thinking", "text": _th}
                     chunk = msg.get("content") or obj.get("response") or ""
                     if chunk:
-                        full.append(chunk)
-                        yield {"type": "token", "text": chunk}
+                        for _kind, _part in (_tsplit.feed(chunk) if _tsplit else [("token", chunk)]):
+                            if _kind == "thinking":
+                                thinking_parts.append(_part)
+                                yield {"type": "thinking", "text": _part}
+                            else:
+                                full.append(_part)
+                                yield {"type": "token", "text": _part}
                     if obj.get("done"):
                         break
         except _LockTimeout:
@@ -340,6 +391,7 @@ class OllamaClient:
                             "model": retry.get("model"),
                             "success": bool(retry.get("success")),
                             "error": retry.get("error"),
+                            "thinking": retry.get("thinking") or "",
                             "fallback_from": use,
                             "fallback_reason": "memory_pressure",
                         }
@@ -366,8 +418,11 @@ class OllamaClient:
 
         if stream_error:
             return
+        for _kind, _part in (_tsplit.flush() if _tsplit else []):
+            (thinking_parts if _kind == "thinking" else full).append(_part)
         reply = "".join(full).strip() or "Keine Antwort erzeugt."
-        yield {"type": "done", "reply": reply, "model": use, "success": True, "error": None}
+        yield {"type": "done", "reply": reply, "model": use, "success": True, "error": None,
+               "thinking": "".join(thinking_parts).strip(), "think": bool(payload["think"])}
 
     def vision(self, prompt: str, image_bytes: bytes, model: str | None = None) -> dict:
         use = model or self.has_vision()

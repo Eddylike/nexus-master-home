@@ -3403,6 +3403,13 @@ class MasterController:
     def _early_or_special(self, message: str, session_messages: list, decision: dict, intent: str, steps: list) -> dict | None:
         """Return result dict if handled without LLM streaming; else None."""
 
+        # NOTIF_READ_V1: echte Quelle (wpndatabase.db read-only), keine Websuche
+        if intent == "notifications_read":
+            from nexus.computer.notifications import read_notifications
+            out = read_notifications(app=decision.get("app"))
+            return {"success": bool(out.get("success")), "reply": out.get("reply"),
+                    "intent": "notifications_read", "plan": steps, "data": out, "speak": True}
+
         # NEXUS_DIRECT_WRITE_MULTISTEP_GUARD_V1
         # Der schnelle Write-Pfad ist nur fuer einfache Einzelaktionen.
         # Mehrschrittige Build-/Repair-Auftraege muessen in den Agent-Loop.
@@ -5435,11 +5442,13 @@ class MasterController:
         model = None
         success = False
         error = None
+        thinking = ""
         for ev in self.llm.chat_stream(msgs):
-            if ev.get("type") == "token":
+            if ev.get("type") in ("token", "thinking"):  # THINK-02
                 yield ev
             elif ev.get("type") == "done":
                 full_reply = ev.get("reply") or ""
+                thinking = ev.get("thinking") or ""
                 model = ev.get("model")
                 success = bool(ev.get("success"))
                 error = ev.get("error")
@@ -5471,6 +5480,7 @@ class MasterController:
             "model": model,
             "success": success,
             "error": error,
+            "thinking": thinking,
         }
 
     def _ok(self, reply: str, intent: str, steps: list, data: Any = None) -> dict:

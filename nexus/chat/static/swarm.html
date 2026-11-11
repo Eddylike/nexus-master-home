@@ -26,6 +26,59 @@ input{flex:1;min-width:260px}button{cursor:pointer;border-color:var(--c)}
 </style></head><body class="nx-4d"><main>
 <h1>NEXUS Swarm AI</h1><p class="sub">Swarm Master koordiniert, Agenten pruefen sich gegenseitig, beste Loesung per Abstimmung.</p>
 <div class="agents" id="agents"></div>
+<div id="display-check"><span class="check-wait" id="dev-1">DISPLAY1</span>: <span class="check-ok" id="disp-1">OK</span> <span class="check-wait" id="dev-2">/ DISPLAY2</span>: <span class="check-wait" id="disp-2">ERLEBTE SICH?</span></div>
+<!-- NEXUS MASTER HOME: Sichtpruefung fuer DISPLAY1/2 (Robustheit gegen fehlende Fenstergrößen-Info) -->
+<script>
+// NEXUS MASTER HOME: Robuste und sichere Sichtpruefung fuer DISPLAY1/2
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  try {
+    const d1 = document.getElementById('disp-1');
+    if (d1) { d1.textContent = 'OK'; }
+
+    const parentContainer = document.getElementById('display-check');
+    if (parentContainer) {
+      // NEXUS MASTER HOME: Robustere Sichtpruefung fuer DISPLAY2
+            // NEXUS MASTER HOME: Sichtpruefung fuer DISPLAY2 (Robustheit)
+      const dev2Label = document.getElementById('dev-2'); // Robusterer Zugriff via getElementById statt falschem Syntax
+      if (dev2Label) {
+        const currentText = dev2Label.textContent?.trim() || '';
+        // Status auf 'OK' setzen, wenn erfeessbar und Inhalt stimmt, sonst Warnung
+        if (currentText && !currentText.toLowerCase().includes('ok')) {
+          if (!currentText || ['nicht erfaessbar', 'erfassen'].includes(currentText.trim()) || currentText.includes('?')) {
+            dev2Label.textContent = 'Nicht erfaessbar';
+          } else {
+            dev2Label.textContent = 'OK'; // Standard fuer Erfolg
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Sichtpruefung bei NEXUS MASTER HOME fehlgeschlagen:', e);
+  }
+}</script>
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('NEXUS Display-Check Error:', e);
+  }
+}
+</script>    </script>
+  
+  try {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => checkDisplay(), { once: true });
+    } else {
+      checkDisplay();
+    }
+  } catch (err) {
+    console.warn('NEXUS DISPLAY CHECK FEHLER im Initialisierungs-Block:', err.message);
+  }
+} catch (e) {
+  console.warn('NEXUS DISPLAY CHECK GLOBAL Error:', e.message);
+}
+</script>
+}</script>
 <div id="graph"></div>
 <form id="f"><input id="task" value="Liste die Dateien in workspace\reports und fasse zusammen" aria-label="Aufgabe">
 <select id="mode" aria-label="Modus"><option value="pipeline">Pipeline</option><option value="vote">Abstimmung (3 Builder)</option></select>

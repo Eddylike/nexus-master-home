@@ -49,10 +49,7 @@ def plan_local_work(text: str) -> dict:
     steps = []
     if mobile:
         steps.append({"action": "android_devices", "params": {}, "title": "ADB-Geräte prüfen", "depends_on": []})
-        # A specific phone must come from the request, never from an old session.
-        if device:
-            steps.append({"action": "termux_phase_a_control", "params": {"device": device, "action": "health"},
-                          "title": "Termux und lokale KI auf dem Handy prüfen", "depends_on": [0]})
+        # Phone AI is not probed through the retired Phase-A control service.
     else:
         steps.append({"action": "llm_status", "params": {}, "title": "Lokale Ollama-Modelle auf dem PC prüfen", "depends_on": []})
     for step in steps:
@@ -80,13 +77,8 @@ def capability_gaps(plan: dict, records: list[dict]) -> list[dict]:
         if state != "device":
             return gap("ADB_TARGET_" + (state.upper() if state else "NOT_CONNECTED"),
                        "ADB-Ziel " + plan["device"] + ": " + (state or "nicht verbunden") + ".")
-        health = next((r.get("result") or {} for r in records if r.get("task") == "termux_phase_a_control"), {})
-        ai = health.get("local_ai")
-        if not isinstance(ai, dict):
-            return gap("PHONE_LOCAL_AI_UNVERIFIED", "Die registrierte Termux-Health-Aktion liefert keinen Nachweis zur KI auf dem Handy.")
-        if ai.get("status") != "ONLINE":
-            return gap(str(ai.get("reason") or "PHONE_LOCAL_AI_OFFLINE"),
-                       "Lokale KI auf dem Handy: " + str(ai.get("detail") or ai.get("reason") or ai.get("status")) + ".")
+        return gap("PHONE_LOCAL_AI_UNVERIFIED",
+                   "ADB-Gerät ist erreichbar. Ein unabhängiger, aktiver Nachweis der lokalen Handy-KI fehlt, solange kein frischer App-Heartbeat vorliegt.")
     else:
         status = next((r.get("result") or {} for r in records if r.get("task") == "llm_status"), {})
         ai = status.get("ollama") or {}
@@ -108,8 +100,7 @@ def capability_gaps(plan: dict, records: list[dict]) -> list[dict]:
     if plan["integration"]:
         return gap("LOCAL_INTEGRATION_CONTRACT_REQUIRED",
                    "Die Vorprüfung ist belegt. Für die Integration fehlt ein validierter Änderungsplan mit konkreten Quelldateien, Backups und Offline-Abnahmetest. "
-                   "Hermes-Datei-/Prüfwerkzeuge, python_run_project_script und ADB-Transfers bleiben an ihre vorhandenen Verträge gebunden; "
-                   "deploy_phase_a_control benötigt weiterhin eine lokale PRIVILEGED-Freigabe.")
+                   "Hermes-Datei-/Prüfwerkzeuge, python_run_project_script und ADB-Transfers bleiben an ihre vorhandenen Verträge gebunden.")
     if re.search(r"\b(?:offlinebetrieb|chat|gespräch\w*|gespraech\w*|antwort\w*|inferenz|generate|generation)\b", request):
         return gap("LOCAL_FUNCTIONAL_TEST_REQUIRED",
                    "Die Statusabfrage belegt Erreichbarkeit und Modellliste. Der ausdrücklich verlangte Chat-/Inferenz-/Offline-Test "

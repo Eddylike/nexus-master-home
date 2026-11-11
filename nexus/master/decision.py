@@ -120,6 +120,7 @@ def _norm_app_name(name: str) -> str:
     n = re.sub(r"\s+", " ", n)
     n = re.sub(r"\bwhats\s*[-_]?\s*app\b", "whatsapp", n)
     n = n.replace("whats-app", "whatsapp").replace("whats app", "whatsapp")
+    n = n.strip(" .!?,;:\"'")
     return n.strip()
 
 def _directory_list_request(raw: str) -> str | None:
@@ -166,19 +167,37 @@ def strip_answer_policy(text):
 
 def _decide_base(message: str) -> dict:
     """Gibt intent + ggf. early_reply / params zurueck."""
+    # 2026-11-09 FIXALL: Rollenspiel/Konzil/Haus nie als Werkzeug-/Maus-/Bau-Auftrag.
     raw = strip_wake(strip_answer_policy(message or ""))
     raw = _normalize_cmd(raw)
     low = raw.lower().strip()
 
+    # 2026-11-09 FIXALL: Spielprompts (Konzil/Haus/Rollenspiel) immer Chat, nie Tools/OS.
+    if re.search(
+        r"\b(rollenspiel|spielregeln|konzil der|haus der (?:fuenf|fünf) t(?:ue|ü)ren|ethik-planspiel)\b",
+        low,
+        re.I,
+    ) or ("simulation" in low and "spiel" in low):
+        return {"intent": "chat", "early": False, "game": True}
+
     if not raw:
         return {"intent": "chat", "early": True, "reply": "Sag mir was — ich hoere zu."}
+
+    # NOTIF_READ_V1: WhatsApp/Windows-Benachrichtigungen vorlesen -> echtes Tool, nie Websuche
+    try:
+        from nexus.computer.notifications import match_request as _nr_match
+        _nr = _nr_match(raw)
+    except Exception:
+        _nr = None
+    if _nr is not None:
+        return {"intent": "notifications_read", "early": True, "app": _nr.get("app")}
 
     directory_path = _directory_list_request(raw)
     if directory_path is not None:
         return {"intent": "project_list_dir", "early": True, "path": directory_path}
 
     # Uhrzeit / Datum — echte lokale Zeit, kein Platzhalter
-    if re.search(r"\b(wie\s+sp[aä]t|uhrzeit|wie\s+viel\s+uhr|welche[sr]?\s+tag|welches\s+datum|heutiges\s+datum)\b", low) or low in ("zeit", "datum", "uhr"):
+    if re.search(r"\b(wie\s+sp(?:ae|[aä])t|uhrzeit|wie\s+viel\s+uhr|welche[sr]?\s+tag|welches\s+datum|heutiges\s+datum)\b", low) or low in ("zeit", "datum", "uhr"):
         from datetime import datetime
         now = datetime.now()
         reply = now.strftime("Es ist %H:%M Uhr am %d.%m.%Y.")

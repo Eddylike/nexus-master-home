@@ -78,7 +78,7 @@ def test_permissions_source_and_approval(lib, tmp_path):
 
 def test_api_loopback_only(lib):
     st, _ = lib
-    assert api.handle("GET", "/api/studio/status", {}, None, "192.0.2.11", st)[0] == 403
+    assert api.handle("GET", "/api/studio/status", {}, None, "192.168.1.50", st)[0] == 403
     code, body = api.handle("GET", "/api/studio/status", {}, None, "127.0.0.1", st)
     assert code == 200 and body["stats"]["total"] == 0
     assert api.handle("POST", "/api/studio/edit", {}, {"id": "x", "op": "auto"}, "127.0.0.1", st)[0] == 404

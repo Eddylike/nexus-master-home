@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "agent": "OMEGA",
+  "tools": [
+    {
+      "name": "web_search",
+      "module": "web",
+      "description": "Live-Websuche (DuckDuckGo/Bing/Wikipedia) mit echten Treffern, Quellen und Datum. Keine erfundenen Ergebnisse.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "maxLength": 500},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+          "news": {"type": "boolean"}
+        },
+        "required": ["query"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["web", "research"]
+    },
+    {
+      "name": "fetch_page",
+      "module": "web",
+      "description": "Webseite laden, lesbaren Text extrahieren, sanitisieren und optional in den lokalen RAG-Speicher schreiben.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "maxLength": 2000},
+          "max_chars": {"type": "integer", "minimum": 1000, "maximum": 120000},
+          "save": {"type": "boolean"}
+        },
+        "required": ["url"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["web", "research"]
+    },
+    {
+      "name": "rag_add",
+      "module": "web",
+      "description": "Dokument in den lokalen FTS5-RAG-Speicher aufnehmen.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "source": {"type": "string", "maxLength": 500},
+          "title": {"type": "string", "maxLength": 500},
+          "content": {"type": "string", "maxLength": 400000},
+          "meta": {"type": "object"}
+        },
+        "required": ["content"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "rate": {"limit": 60, "window_s": 60},
+      "tags": ["rag", "memory"]
+    },
+    {
+      "name": "rag_search",
+      "module": "web",
+      "description": "Lokalen RAG-Speicher durchsuchen (FTS5, Fallback LIKE).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "maxLength": 500},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+        },
+        "required": ["query"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 60, "window_s": 60},
+      "tags": ["rag", "memory"]
+    },
+    {
+      "name": "slack_post",
+      "module": "slack",
+      "description": "Nachricht als Block Kit an Slack senden (Webhook oder Bot-Token). Immer Freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "text": {"type": "string", "maxLength": 4000},
+          "title": {"type": "string", "maxLength": 150},
+          "channel": {"type": "string", "maxLength": 200},
+          "blocks": {"type": "array"},
+          "thread_ts": {"type": "string", "maxLength": 100}
+        },
+        "required": ["text"]
+      },
+      "permission": "external",
+      "destructive": true,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["slack", "productivity", "external"]
+    },
+    {
+      "name": "slack_read",
+      "module": "slack",
+      "description": "Nachrichten eines Slack-Channels lesen (Bot-Token erforderlich).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "channel": {"type": "string", "maxLength": 200},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+        },
+        "required": ["channel"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["slack", "productivity"]
+    },
+    {
+      "name": "slack_channels",
+      "module": "slack",
+      "description": "Verfuegbare Slack-Channels auflisten (Bot-Token erforderlich).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {"type": "integer", "minimum": 1, "maximum": 200}
+        },
+        "required": []
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 10, "window_s": 60},
+      "tags": ["slack", "productivity"]
+    },
+    {
+      "name": "notion_query",
+      "module": "notion",
+      "description": "Notion-Datenbank abfragen (Token erforderlich).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {"type": "string", "maxLength": 200},
+          "filter": {"type": "object"},
+          "page_size": {"type": "integer", "minimum": 1, "maximum": 100}
+        },
+        "required": ["database_id"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["notion", "productivity"]
+    },
+    {
+      "name": "notion_create_page",
+      "module": "notion",
+      "description": "Seite in einer Notion-Datenbank anlegen. Freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "database_id": {"type": "string", "maxLength": 200},
+          "title": {"type": "string", "maxLength": 500},
+          "content": {"type": "string", "maxLength": 20000},
+          "properties": {"type": "object"}
+        },
+        "required": ["database_id", "title"]
+      },
+      "permission": "external",
+      "destructive": true,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["notion", "productivity", "external"]
+    },
+    {
+      "name": "trigger_webhook",
+      "module": "webhook",
+      "description": "Generischen Webhook ausloesen (z. B. Zapier Catch Hook) und damit externe Apps anbinden. Freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "maxLength": 2000},
+          "payload": {"type": "object"},
+          "method": {"type": "string", "enum": ["POST", "PUT", "PATCH"]}
+        },
+        "required": ["payload"]
+      },
+      "permission": "external",
+      "destructive": true,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["webhook", "zapier", "external"]
+    },
+    {
+      "name": "stock_quote",
+      "module": "finance",
+      "description": "Live-Aktienkurs abrufen (yfinance, Yahoo-Chart oder Stooq). Keine erfundenen Zahlen.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "symbol": {"type": "string", "maxLength": 30},
+          "market": {"type": "string", "maxLength": 20}
+        },
+        "required": ["symbol"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["finance"]
+    },
+    {
+      "name": "eu_lex",
+      "module": "legal",
+      "description": "EU-Rechtstext ueber CELEX-Nummer von EUR-Lex laden und sanitisieren.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "celex": {"type": "string", "maxLength": 40},
+          "language": {"type": "string", "enum": ["DE", "EN", "FR"]}
+        },
+        "required": ["celex"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["legal", "research"]
+    },
+    {
+      "name": "legal_search",
+      "module": "legal",
+      "description": "Websuche beschraenkt auf amtliche/offene Rechtsquellen (EUR-Lex, gesetze-im-internet).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "maxLength": 300},
+          "limit": {"type": "integer", "minimum": 1, "maximum": 10}
+        },
+        "required": ["query"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["legal", "research"]
+    },
+    {
+      "name": "run_python",
+      "module": "code",
+      "description": "Python-Code in der isolierten Sandbox ausfuehren (Docker, sonst nur mit expliziter Freigabe).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "string", "maxLength": 200000},
+          "timeout": {"type": "integer", "minimum": 1, "maximum": 60},
+          "stdin": {"type": "string", "maxLength": 20000}
+        },
+        "required": ["code"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["code", "sandbox"]
+    },
+    {
+      "name": "lint_python",
+      "module": "code",
+      "description": "Python-Code statisch pruefen (Syntax/AST, gefaehrliche Muster).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {"type": "string", "maxLength": 200000}
+        },
+        "required": ["code"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 60, "window_s": 60},
+      "tags": ["code"]
+    },
+    {
+      "name": "write_code",
+      "module": "code",
+      "description": "Code-Datei im OMEGA-Sandboxverzeichnis speichern (kein Zugriff ausserhalb).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "maxLength": 300},
+          "code": {"type": "string", "maxLength": 200000}
+        },
+        "required": ["path", "code"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "lint_params": ["code"],
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["code", "sandbox"]
+    },
+    {
+      "name": "git_repo",
+      "module": "git",
+      "description": "Git-Befehle ohne Shell in erlaubten Repo-Pfaden. Push/Loeschen/Reset sind freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "args": {"type": "array", "maxItems": 30},
+          "cwd": {"type": "string", "maxLength": 500}
+        },
+        "required": ["args"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "dynamic_guard": true,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["git", "dev"]
+    },
+    {
+      "name": "github",
+      "module": "git",
+      "description": "GitHub ueber die gh-CLI (bestehende NEXUS-Guards). Schreibende Aktionen sind freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string", "maxLength": 2000},
+          "cwd": {"type": "string", "maxLength": 500}
+        },
+        "required": ["command"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "dynamic_guard": true,
+      "rate": {"limit": 20, "window_s": 60},
+      "tags": ["git", "dev"]
+    },
+    {
+      "name": "render_html",
+      "module": "vision",
+      "description": "HTML in einem headless Chrome/Edge rendern und als PNG speichern.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "html": {"type": "string", "maxLength": 200000},
+          "width": {"type": "integer", "minimum": 200, "maximum": 4000},
+          "height": {"type": "integer", "minimum": 200, "maximum": 4000},
+          "name": {"type": "string", "maxLength": 100}
+        },
+        "required": ["html"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "rate": {"limit": 10, "window_s": 60},
+      "tags": ["vision", "dev"]
+    },
+    {
+      "name": "files_list",
+      "module": "files",
+      "description": "Dateien im OMEGA-Scratch-Verzeichnis auflisten.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "maxLength": 300}
+        },
+        "required": []
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 60, "window_s": 60},
+      "tags": ["files"]
+    },
+    {
+      "name": "files_read",
+      "module": "files",
+      "description": "Textdatei aus dem OMEGA-Scratch-Verzeichnis lesen.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "maxLength": 300}
+        },
+        "required": ["path"]
+      },
+      "permission": "read",
+      "destructive": false,
+      "rate": {"limit": 60, "window_s": 60},
+      "tags": ["files"]
+    },
+    {
+      "name": "files_write",
+      "module": "files",
+      "description": "Textdatei im OMEGA-Scratch-Verzeichnis schreiben (max. 200 KB).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "maxLength": 300},
+          "content": {"type": "string", "maxLength": 200000}
+        },
+        "required": ["path", "content"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "rate": {"limit": 60, "window_s": 60},
+      "tags": ["files"]
+    },
+    {
+      "name": "files_delete",
+      "module": "files",
+      "description": "Datei im OMEGA-Scratch-Verzeichnis loeschen. Immer freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {"type": "string", "maxLength": 300}
+        },
+        "required": ["path"]
+      },
+      "permission": "destructive",
+      "destructive": true,
+      "rate": {"limit": 10, "window_s": 60},
+      "tags": ["files", "destructive"]
+    },
+    {
+      "name": "http_request",
+      "module": "http",
+      "description": "Generische HTTP-Anfrage. GET/HEAD frei, schreibende Methoden freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "method": {"type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"]},
+          "url": {"type": "string", "maxLength": 2000},
+          "headers": {"type": "object"},
+          "json_body": {"type": "object"},
+          "body": {"type": "string", "maxLength": 100000},
+          "timeout": {"type": "integer", "minimum": 1, "maximum": 120}
+        },
+        "required": ["url"]
+      },
+      "permission": "external",
+      "destructive": false,
+      "dynamic_guard": true,
+      "rate": {"limit": 30, "window_s": 60},
+      "tags": ["http", "external"]
+    },
+    {
+      "name": "propose_tool",
+      "module": "skills",
+      "description": "Neues Python-Tool als Kandidat schreiben und in der Sandbox testen. Noch keine Registrierung.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "maxLength": 60},
+          "description": {"type": "string", "maxLength": 1000},
+          "code": {"type": "string", "maxLength": 100000},
+          "test_code": {"type": "string", "maxLength": 100000}
+        },
+        "required": ["name", "code"]
+      },
+      "permission": "write",
+      "destructive": false,
+      "lint_params": ["code"],
+      "rate": {"limit": 10, "window_s": 60},
+      "tags": ["self-improvement", "code"]
+    },
+    {
+      "name": "promote_tool",
+      "module": "skills",
+      "description": "Getestetes Kandidaten-Tool dauerhaft in die User-Plugin-Registry uebernehmen. Freigabepflichtig.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "maxLength": 60},
+          "parameters": {"type": "object"},
+          "description": {"type": "string", "maxLength": 1000}
+        },
+        "required": ["name"]
+      },
+      "permission": "destructive",
+      "destructive": true,
+      "rate": {"limit": 5, "window_s": 60},
+      "tags": ["self-improvement", "destructive"]
+    }
+  ]
+}

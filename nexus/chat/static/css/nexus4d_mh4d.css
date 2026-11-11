@@ -1,0 +1,120 @@
+/* MH4D 20261111 Babyblau-Glas / Giftgruen / dezentes Lila (Layout unveraendert, Zocker unangetastet).
+   Ursprung: – 4D-Daemmerung Master Home, Endstand nach Vorschau preview_master_home.html.
+   Wird als LETZTES Stylesheet geladen. Nur Optik, keine Funktion entfernt.
+   Rollback: <link ... nexus4d_mh4d.css> aus index.html entfernen. */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d{
+  --m4-bg:#b8e4f8;--m4-panel:rgba(255,255,255,.42);--m4-card:rgba(248,252,255,.88);--m4-line:rgba(90,61,154,.18);
+  --m4-text:#12203a;--m4-dim:#3a4d6b;--m4-c:#0A6B22;--m4-v:#5A3D9A;--m4-m:#5A3D9A;--m4-g:#0A6B22;--m4-a:#c67c12;--m4-r:#ff5d6c;--m4-neon:#39FF14;--m4-lilac:#c9b4e8;
+  --m4-r-s:8px;--m4-r-m:12px;--m4-r-l:16px;--m4-fs-xs:11px;--m4-fs-s:12px;--m4-fs-m:13.5px;--m4-fs-l:15px;--m4-h:32px;
+  font-size:var(--m4-fs-m)}
+/* ---------- Rahmen ---------- */
+@media (min-width:1660px) and (min-height:560px){html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxReferenceScene#nxReferenceScene{gap:0!important;border:1px solid var(--m4-line)!important;border-radius:var(--m4-r-l)!important;background:rgba(255,255,255,.36)!important;box-shadow:0 0 0 1px rgba(255,255,255,.70),inset 0 1px 0 rgba(255,255,255,.75),0 30px 80px rgba(18,32,58,.12)!important;overflow:hidden!important}}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxApp#nxApp{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}
+/* ---------- Sidebar: Text-Navigation ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxSide#nxSide{padding:14px 12px!important;gap:6px!important;border-right:1px solid var(--m4-line)!important;background:rgba(255,255,255,.38)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxSide .side-brand{display:flex!important;align-items:center!important;gap:10px!important;padding:2px 6px 8px!important;margin:0!important;min-height:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxSide .side-brand .logo-mark{width:30px!important;height:30px!important;min-width:30px!important;font-size:15px!important;border-radius:9px!important;box-shadow:0 0 14px rgba(57,255,20,.40)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxSide .side-brand .logo-title{font-size:var(--m4-fs-l)!important;letter-spacing:.22em!important;font-weight:800!important;background:linear-gradient(90deg,var(--m4-c),var(--m4-v));-webkit-background-clip:text;background-clip:text;color:transparent!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxSide .side-brand .logo-sub{font-size:9.5px!important;letter-spacing:.14em!important;color:var(--m4-dim)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #btnNewChat#btnNewChat{height:36px!important;min-height:36px!important;padding:0 12px!important;border-radius:var(--m4-r-m)!important;border:0!important;background:linear-gradient(90deg,#39FF14,#c9b4e8)!important;color:#12203a!important;font-weight:700!important;font-size:var(--m4-fs-m)!important;justify-content:center!important;box-shadow:0 4px 18px rgba(57,255,20,.35)!important;margin:0 0 6px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav#nxGlassNav{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;gap:1px!important;padding:0!important;margin:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-button{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;height:32px!important;min-height:32px!important;width:100%!important;padding:0 10px!important;border-radius:var(--m4-r-s)!important;border:0!important;border-left:2px solid transparent!important;background:transparent!important;box-shadow:none!important;color:#12203a!important;font-size:var(--m4-fs-m)!important;font-weight:500!important;text-align:left!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-button:hover{background:rgba(57,255,20,.10)!important;color:#0A6B22!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-button:is(.active,[aria-current=page],[aria-pressed=true]){background:linear-gradient(90deg,rgba(57,255,20,.18),rgba(57,255,20,0))!important;border-left-color:#39FF14!important;color:#12203a!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-button :is(svg,.nx-glass-icon){width:16px!important;height:16px!important;min-width:16px!important;flex:0 0 16px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-button *{font-size:inherit!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-section{margin-top:12px!important;position:relative!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassNav .nx-glass-nav-section::before{content:"";position:absolute;left:8px;right:8px;top:-7px;height:1px;background:var(--m4-line)}
+/* ---------- Header 56px ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop#nxTop{height:56px!important;min-height:56px!important;max-height:56px!important;padding:0 16px!important;gap:8px!important;align-items:center!important;flex-wrap:nowrap!important;border-bottom:1px solid var(--m4-line)!important;overflow:visible!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop :is(button,summary,.nx-glass-chip,.chip){height:30px!important;min-height:30px!important;padding:0 11px!important;font-size:var(--m4-fs-s)!important;line-height:28px!important;border-radius:var(--m4-r-s)!important;white-space:nowrap!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #btnToggleSide{width:30px!important;padding:0!important;flex:0 0 30px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop .top-title{flex:1 1 auto!important;min-width:0!important;max-width:none!important;display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;height:30px!important;padding:0!important;margin:0!important;background:transparent!important;border:0!important;box-shadow:none!important;overflow:hidden!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop .top-title::before,html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop .top-title::after{display:none!important;content:none!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #chatTitle{display:block!important;min-width:0!important;flex:0 1 auto!important;font-size:var(--m4-fs-m)!important;font-weight:600!important;color:var(--m4-text)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;background:none!important;-webkit-text-fill-color:currentColor!important;line-height:30px!important;letter-spacing:0!important;text-transform:none!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #chipModel{flex:0 0 auto!important;font-size:var(--m4-fs-xs)!important;color:var(--m4-dim)!important;padding:2px 8px!important;border:1px solid var(--m4-line)!important;border-radius:var(--m4-r-s)!important;line-height:16px!important;margin:0!important;position:static!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop :is(#btnLiveHub,#btnTerminal,#nxGlassSystemControls>summary,#nxGlassActivity){background:rgba(255,255,255,.50)!important;border:1px solid var(--m4-line)!important;color:#12203a!important;font-weight:600!important;flex:0 0 auto!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #btnLiveHub[aria-expanded=true]{border-color:rgba(61,255,154,.45)!important;color:var(--m4-g)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #btnZocker{background:rgba(255,40,60,.16)!important;border:1px solid rgba(255,70,90,.7)!important;color:#ff6b7a!important;font-weight:800!important;flex:0 0 auto!important;letter-spacing:.06em!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassHeaderStatus{flex:0 0 auto!important;display:flex!important;margin:0!important;padding:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassHealth{background:rgba(10,107,34,.10)!important;border:1px solid rgba(10,107,34,.40)!important;color:var(--m4-g)!important;border-radius:999px!important;gap:6px!important;display:inline-flex!important;align-items:center!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassHealth svg{width:13px!important;height:13px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassSystemControls{flex:0 0 auto!important;position:relative!important;margin:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassHeaderTools{flex:0 0 auto!important;display:flex!important;align-items:center!important;gap:8px!important;margin:0!important;padding:0!important;background:transparent!important;border:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassActivity .nx-glass-button-label{display:none!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassActivity{width:30px!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassClock{display:flex!important;flex-direction:row!important;align-items:baseline!important;gap:8px!important;height:30px!important;padding:0 4px!important;background:transparent!important;border:0!important;box-shadow:none!important;min-width:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassDate{font-size:var(--m4-fs-xs)!important;color:var(--m4-dim)!important;white-space:nowrap!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassTime{font:700 var(--m4-fs-l)/30px ui-monospace,Consolas,monospace!important;color:var(--m4-text)!important}
+/* ---------- Raum-Kopf schlank ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxAiRoom#nxAiRoom{min-height:0!important;height:auto!important;padding:8px 0 0!important;max-width:980px!important;margin:0 auto!important}
+/* ---------- Chat ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages{max-width:980px!important;margin-inline:auto!important;gap:14px!important;padding:12px 8px 18px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row.user .msg-body{background:linear-gradient(90deg,#2f4f8a,#5A3D9A)!important;color:#fff!important;border:0!important;border-radius:var(--m4-r-l) var(--m4-r-l) 4px var(--m4-r-l)!important;padding:10px 14px!important;max-width:74%!important;box-shadow:0 6px 22px rgba(90,61,154,.28)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row.assistant .msg-body{background:var(--m4-card)!important;color:var(--m4-text)!important;border:1px solid var(--m4-line)!important;border-left:3px solid #39FF14!important;border-radius:4px var(--m4-r-l) var(--m4-r-l) var(--m4-r-l)!important;padding:10px 14px!important;max-width:84%!important;box-shadow:0 6px 22px rgba(0,0,0,.25)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row .content{font-size:var(--m4-fs-m)!important;line-height:1.55!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row .who{font-size:var(--m4-fs-xs)!important;letter-spacing:.08em!important;color:var(--m4-dim)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row.user .who{color:rgba(255,255,255,.75)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row .meta{font-size:var(--m4-fs-xs)!important;color:var(--m4-dim)!important}
+/* ---------- Terminal-Leiste ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTerminal.collapsed{max-width:980px!important;margin:0 auto 6px!important}
+/* ---------- Composer: nur er gerahmt ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer#nxComposer{background:transparent!important;border:0!important;box-shadow:none!important;padding:4px 16px 0!important;max-width:1012px!important;width:100%!important;margin:0 auto!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-shell{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-box{min-height:48px!important;padding:6px 6px 6px 8px!important;gap:6px!important;align-items:center!important;border-radius:var(--m4-r-m)!important;border:1px solid rgba(255,255,255,.80)!important;background:rgba(255,255,255,.72)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 8px 30px rgba(18,32,58,.10)!important;transition:border-color .2s,box-shadow .2s!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-box:focus-within{border-color:rgba(57,255,20,.65)!important;box-shadow:0 0 0 3px rgba(57,255,20,.16),0 0 24px rgba(201,180,232,.35)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer #nxInput{min-height:34px!important;height:34px;padding:7px 6px!important;font-size:var(--m4-fs-m)!important;background:transparent!important;border:0!important;box-shadow:none!important;color:var(--m4-text)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-icon{width:32px!important;height:32px!important;min-width:32px!important;border-radius:var(--m4-r-s)!important;background:rgba(255,255,255,.04)!important;border:1px solid var(--m4-line)!important;padding:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-icon svg{width:16px!important;height:16px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer #nxGlassTarget{height:32px!important;padding:0 6px 0 10px!important;font-size:var(--m4-fs-s)!important;border-radius:var(--m4-r-s)!important;border:1px solid var(--m4-line)!important;background:rgba(255,255,255,.03)!important;gap:4px!important;white-space:nowrap!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer #nxGlassTargetSelect{height:28px!important;font-size:var(--m4-fs-s)!important;background:transparent!important;border:0!important;color:var(--m4-text)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer :is(#btnSend,#btnStopGen){width:auto!important;min-width:44px!important;height:34px!important;border-radius:var(--m4-r-s)!important;padding:0 14px!important;background:linear-gradient(90deg,#39FF14,#c9b4e8)!important;border:0!important;color:#12203a!important;box-shadow:0 4px 16px rgba(57,255,20,.28)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer #btnSend svg{width:16px!important;height:16px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-meta{background:transparent!important;border:0!important;padding:4px 4px 0!important;min-height:0!important;gap:8px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer .composer-meta .hint{font-size:var(--m4-fs-xs)!important;color:var(--m4-dim)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;min-width:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer #btnExtras{height:20px!important;font-size:var(--m4-fs-xs)!important;padding:0 8px!important;border-radius:6px!important;background:rgba(255,255,255,.04)!important;border:1px solid var(--m4-line)!important;color:var(--m4-dim)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassQuickActions#nxGlassQuickActions{background:transparent!important;border:0!important;box-shadow:none!important;padding:2px 0 0!important;margin:0 auto!important;min-height:0!important;justify-content:center!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxGlassQuickActions .nx-glass-more{height:24px!important;min-height:24px!important;padding:0 10px!important;font-size:var(--m4-fs-xs)!important;border-radius:999px!important;background:transparent!important;border:1px solid var(--m4-line)!important;color:var(--m4-dim)!important;box-shadow:none!important}
+/* ---------- Dock ohne Kasten ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock#n4Dock{background:transparent!important;border:0!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:6px 0 10px!important;gap:22px!important;justify-content:center!important;min-height:0!important;height:auto!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock .nx-reference-app-tile{width:72px!important;min-width:72px!important;max-width:72px!important;height:auto!important;padding:0!important;gap:5px!important;background:transparent!important;border:0!important;box-shadow:none!important;display:flex!important;flex-direction:column!important;align-items:center!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock .nx-reference-app-logo{width:40px!important;height:40px!important;border-radius:11px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock .nx-reference-app-name{display:block!important;max-width:72px!important;font-size:var(--m4-fs-xs)!important;line-height:1.2!important;color:#3a4d6b!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;text-align:center!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock .nx-reference-app-tile:hover .nx-reference-app-logo{transform:translateY(-2px)!important;box-shadow:0 0 18px rgba(57,255,20,.50)!important}
+/* ---------- Live-Hub dunkel, Mono ---------- */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub#nxLiveHub{background:rgba(255,255,255,.55)!important;border:0!important;border-left:1px solid rgba(255,255,255,.70)!important;border-radius:0!important;box-shadow:inset 1px 0 0 rgba(255,255,255,.6)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-bar{height:56px!important;min-height:56px!important;padding:0 12px!important;gap:8px!important;align-items:center!important;flex-wrap:nowrap!important;border-bottom:1px solid var(--m4-line)!important;background:transparent!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-title{font:700 var(--m4-fs-s) ui-monospace,Consolas,monospace!important;letter-spacing:.14em!important;color:var(--m4-c)!important;white-space:nowrap!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs{display:flex!important;flex-wrap:nowrap!important;gap:4px!important;min-width:0!important;overflow:hidden!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs button{height:24px!important;padding:0 8px!important;font-size:var(--m4-fs-xs)!important;border-radius:6px!important;background:transparent!important;border:1px solid var(--m4-line)!important;color:var(--m4-dim)!important;white-space:nowrap!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs button.on{color:var(--m4-c)!important;border-color:rgba(57,255,20,.50)!important;background:rgba(57,255,20,.12)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub #btnLiveHubClose{margin-left:auto!important;width:24px!important;height:24px!important;padding:0!important;border-radius:6px!important;background:transparent!important;border:1px solid var(--m4-line)!important;color:var(--m4-dim)!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHubFrame#nxLiveHubFrame{background:rgba(255,255,255,.35)!important;color-scheme:light}
+/* Feinschliff */
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row .msg-body .content{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important;border-radius:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #messages .msg-row.user .msg-body .content{color:#fff!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock .nx-reference-app-tile{width:84px!important;min-width:84px!important;max-width:84px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #n4Dock .nx-reference-app-name{max-width:84px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs button{padding:0 6px!important;font-size:10.5px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-bar{padding:0 10px!important;gap:6px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxComposer#nxComposer{height:auto!important;min-height:0!important;max-height:none!important;padding-bottom:4px!important;flex:0 0 auto!important}
+/* MH4D 1280er-Ansicht (<1660px): Szene ist dort ein fixes Overlay -> transparent lassen, Header kompakt */
+@media not all and (min-width:1660px) and (min-height:560px){
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxReferenceScene#nxReferenceScene{background:transparent!important;box-shadow:none!important;border:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop#nxTop{padding:0 10px!important;gap:6px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop :is(#nxGlassDate,#chipModel,#nxGlassActivity){display:none!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop :is(button,summary,.nx-glass-chip,.chip){padding:0 8px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxTop #nxGlassHealth .nx-glass-button-label{max-width:74px!important;overflow:hidden!important;text-overflow:ellipsis!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs button{padding:0 4px!important;font-size:10px!important}
+}
+
+/* MH4D-08 2026-11-10 (1280x900 Nachmessung): unter 1660px gequetschte Szenen-Kachel 'Skill- & Prompt-Bibliothek' (10px breit, Text ueber Sidebar)
+   ausblenden - Bibliothek bleibt ueber die Sidebar erreichbar; Live-Hub-Leiste kompakt, damit Tabs nicht unter den Einklappen-Knopf laufen. */
+@media not all and (min-width:1660px) and (min-height:560px){
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxReferenceCard-library{display:none!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-title{display:none!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-bar{gap:4px!important;padding:0 6px!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs{gap:3px!important;min-width:0!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub .nx-livehub-tabs button{padding:0 3px!important;font-size:9.5px!important;flex:0 0 auto!important}
+html body#nxBody#nxBody.nx-4d.nx-4d.nx-4d.nx-4d #nxLiveHub #btnLiveHubClose{flex:0 0 24px!important;margin-left:auto!important}
+}

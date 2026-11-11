@@ -219,7 +219,7 @@ def test_maintenance_handler_auth_and_loopback(tmp_path, monkeypatch):
     auth = f"Bearer {token}"
 
     # Non-loopback caller is rejected even with a valid token.
-    remote = _FakeHandler("192.0.2.11", auth)
+    remote = _FakeHandler("10.0.0.7", auth)
     bapi.handle_maintenance(remote, "/api/bridge/maintenance/drain", {})
     assert remote.sent[-1][0] == 403
     assert remote.sent[-1][1]["error"] == "LOCAL_ONLY"

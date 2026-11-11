@@ -203,10 +203,13 @@ def test_web_search_real():
 
 
 def test_shell_run_readonly_sandbox():
+    S.SANDBOX.mkdir(parents=True, exist_ok=True)
+    (S.SANDBOX / "aether_live_test.txt").write_text("live", encoding="utf-8")
     r = S.t_shell_run("Get-ChildItem -Name")
     print(r)
     assert r.get("ok") or r.get("success"), r
     assert "aether_live_test.txt" in r["stdout"] or r.get("returncode") == 0
+    (S.SANDBOX / "aether_live_test.txt").unlink(missing_ok=True)
 
 
 def test_shell_run_c_blocked():

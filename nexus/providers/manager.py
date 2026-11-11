@@ -132,61 +132,14 @@ class ClaudeProvider:
                               out.get("error"), session_id).as_dict()
 
 
-class PhoneLocalProvider:
-    """Optional phone-side provider slot (NEXUS PHONE / Termux).
-
-    The Termux agent is action-only by design, so it exposes no chat endpoint.
-    The slot is therefore measured honestly: reachable -> ONLINE, otherwise
-    UNAVAILABLE. It never fabricates a local phone model and never blocks the
-    local WoZiPC path.
-    """
-
-    name = "phone_local"
-
-    def __init__(self, timeout: float = 30.0) -> None:
-        self.timeout = timeout
-
-    def _agent(self) -> dict[str, Any]:
-        try:
-            from nexus import nexus_os
-
-            return nexus_os.termux_agent_status(timeout=min(self.timeout, 20.0))
-        except Exception as e:  # pragma: no cover - defensive
-            return {"reachable": False, "status": "UNAVAILABLE", "error": type(e).__name__}
-
-    def status(self) -> dict[str, Any]:
-        agent = self._agent()
-        reachable = bool(agent.get("reachable"))
-        return {
-            "provider": self.name,
-            "configured": True,
-            "optional": True,
-            "reachable": reachable,
-            "status": (agent.get("status") if agent.get("status") else ("ONLINE" if reachable else "UNAVAILABLE")),
-            "device": agent.get("device"),
-            "agent": agent.get("agent"),
-            "bind": agent.get("bind"),
-            "chat_capable": False,
-            "error": agent.get("error"),
-            "note": "Termux agent ist action-only; Chat laeuft ueber WOZIPC_LOCAL_AI",
-        }
-
-    def chat(self, message: str, context: list[dict] | None = None, *, session_id: str | None = None, timeout: float | None = None) -> dict[str, Any]:
-        st = self.status()
-        if not st.get("reachable"):
-            return ProviderResult(False, "", self.name, None, st.get("error") or "phone_local_unavailable", session_id).as_dict()
-        return ProviderResult(False, "", self.name, None, "phone_local_not_chat_capable", session_id).as_dict()
-
-
 # Logical NEXUS OS provider ids -> concrete provider keys.
 LOGICAL_PROVIDERS: dict[str, str] = {
-    "PHONE_LOCAL_AI": "phone_local",
     "WOZIPC_LOCAL_AI": "local",
     "CLAUDE": "claude",
     "CHATGPT_OPTIONAL": "openai",
 }
 
-PROVIDER_FALLBACK_ORDER: tuple[str, ...] = ("phone_local", "local", "claude", "openai")
+PROVIDER_FALLBACK_ORDER: tuple[str, ...] = ("local", "claude", "openai")
 
 
 class AIProviderManager:
@@ -204,7 +157,6 @@ class AIProviderManager:
             "local": wozipc,
             "openai": chatgpt,
             "claude": claude,
-            "phone_local": PhoneLocalProvider(min(self.timeout, 60.0)),
         }
         self._instances = {"wozipc_local": wozipc, "chatgpt_optional": chatgpt, "claude": claude}
         self._cancelled: set[str] = set()
@@ -259,13 +211,6 @@ class AIProviderManager:
         # skips the local chain and never creates a cloud dependency.
         if not allow_chatgpt and message and self.route_natural(message) == "openai":
             allow_chatgpt = True
-
-        try:
-            phone_st = self.providers["phone_local"].status()
-        except Exception:
-            phone_st = {}
-        if phone_st.get("reachable") and phone_st.get("chat_capable"):
-            return {"provider": "phone_local", "logical": "PHONE_LOCAL_AI", "reason": "phone_local_suitable", "usable": True}
 
         try:
             wozipc_ok = bool(self.providers["local"].status().get("reachable"))

@@ -10,25 +10,38 @@ input[type=text]{background:#0d1117;color:#c9d1d9;border:1px solid #30363d;paddi
 .k{color:#8b949e}.ok{color:#3fb950}.err{color:#f85149}.d{color:#6e7681;font-size:11px;display:block;margin-left:90px}
 .NEXUS{background:#58a6ff}.Hermes{background:#d2a8ff}.Bridge{background:#ffa657}.Crew{background:#3fb950}
 .Fixer{background:#f85149}.Hermes-PS{background:#f2cc60}.Monitor{background:#8b949e}.NEXUS-GPT{background:#56d4dd}
-/* n4-theme: Daemmerungs-Glas, lesbar */
-html,body{background:transparent!important;color:#f3eefc!important}
-header{background:rgba(30,24,44,.75)!important;border-bottom:1px solid rgba(255,179,71,.18)!important;color:#f3eefc}
-header b{color:#7ff3ff!important}
-input[type=text]{background:rgba(20,16,30,.6)!important;color:#f3eefc!important;border:1px solid rgba(255,179,71,.25)!important;border-radius:8px}
-button{background:rgba(255,255,255,.08);color:#f3eefc;border:1px solid rgba(255,179,71,.25);border-radius:8px}
-.e{border-bottom:1px solid rgba(255,179,71,.12)!important;padding:5px 0!important;animation:n4Sl .25s ease-out both}
-.e::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;background:#00e5ff;box-shadow:0 0 8px #00e5ff;vertical-align:middle}
-.e:has(.err)::before{background:#ff6b6b;box-shadow:0 0 8px #ff6b6b}.e:has(.ok)::before{background:#3dff9a;box-shadow:0 0 8px #3dff9a}
-.t,.k,.d{color:#c9bfdc!important}.ok{color:#5dffad!important}.err{color:#ff8a8a!important}
+/* MH4D-01 20261111: Babyblau-Glas, Mono, farbcodiert, Giftgruen-Leuchtpunkt, Slide-in, Roh-JSON eingeklappt.
+   Selektoren mit "html body" + !important, einheitlich zum Master-Home-Theme. */
+html,html body{background:linear-gradient(180deg,#c5e8f6,#e4d6f5)!important;color:#12203a!important;color-scheme:light}
+html body{font:12px/1.5 ui-monospace,"Cascadia Mono",Consolas,monospace!important}
+html body header{background:rgba(255,255,255,.62)!important;border-bottom:1px solid rgba(255,255,255,.80)!important;color:#12203a!important;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+html body header b{color:#0A6B22!important}
+html.emb body header{display:none!important}
+html body input[type=text]{background:rgba(255,255,255,.72)!important;color:#12203a!important;border:1px solid rgba(90,61,154,.22)!important;border-radius:6px}
+html body button{background:rgba(255,255,255,.55)!important;color:#12203a!important;border:1px solid rgba(90,61,154,.22)!important;border-radius:6px}
+html body #log{padding:4px 10px!important}
+html body #log .e{position:relative;background:transparent!important;border:0!important;border-bottom:1px solid rgba(90,61,154,.12)!important;outline:0!important;box-shadow:none!important;border-radius:0!important;padding:6px 0 6px 14px!important;margin:0!important;color:#12203a!important;animation:n4Sl .25s ease-out both}
+html body #log .e::before{content:"";position:absolute;left:0;top:12px;width:6px;height:6px;border-radius:50%;background:#39FF14;box-shadow:0 0 8px #39FF14}
+html body #log .e:has(.err)::before{background:#c43c4e;box-shadow:0 0 8px #c43c4e}
+html body #log .e:has(.ok)::before{background:#39FF14;box-shadow:0 0 8px #39FF14}
+html body #log .t{color:#3a4d6b!important}
+html body #log .k{color:#3a4d6b!important}
+html body #log .ok{color:#0A6B22!important}
+html body #log .err{color:#9b1c1c!important}
+html body .a{color:#0a0d18!important;border:0!important;border-radius:4px!important;padding:0 5px!important;font-weight:700!important}
+html body #log .d{display:block!important;margin:2px 0 0!important;color:#3a4d6b!important;font-size:10.5px!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;cursor:pointer}
+html body #log .d.open{white-space:pre-wrap!important;overflow:visible!important}
+html body ::-webkit-scrollbar{width:8px}html body ::-webkit-scrollbar-thumb{background:rgba(90,61,154,.28);border-radius:8px}
 @keyframes n4Sl{from{opacity:0;transform:translateX(10px)}}
-@media (prefers-reduced-motion:reduce){.e{animation:none!important}}
-html,body{background:#14101f!important;color:#f3eefc!important}/* n4R13 dusk */
+@media (prefers-reduced-motion:reduce){html body #log .e{animation:none!important}}
 </style></head><body>
 <header><b>NEXUS ⇄ Hermes Live</b><span id="flt"></span>
 <input id="q" type="text" placeholder="Textfilter"><label><input id="as" type="checkbox" checked>Auto-Scroll</label>
 <button id="cl">Leeren</button><span id="st">verbinde…</span></header>
 <div id="log"></div>
 <script>
+try{if(window.top!==window||/[?&]embed=1/.test(location.search))document.documentElement.classList.add("emb")}catch(_){document.documentElement.classList.add("emb")}
+document.addEventListener("click",ev=>{const d=ev.target.closest&&ev.target.closest(".d");if(d){d.classList.toggle("open");d.title=d.classList.contains("open")?"einklappen":"Roh-JSON aufklappen"}});
 const AG=["NEXUS","Hermes","Bridge","Crew","Fixer","Hermes-PS","NEXUS-GPT","Monitor"],on={};const flt=document.getElementById("flt");
 AG.forEach(a=>{on[a]=true;const l=document.createElement("label");l.innerHTML=`<input type=checkbox checked> <span class="a ${a}">${a}</span> `;l.firstChild.onchange=e=>{on[a]=e.target.checked;apply()};flt.appendChild(l)});
 const log=document.getElementById("log"),q=document.getElementById("q"),as=document.getElementById("as"),st=document.getElementById("st");
@@ -40,8 +53,8 @@ function add(e){const d=document.createElement("div");d.className="e";d.dataset.
 const ok=e.ok===true?' <span class=ok>✔</span>':e.ok===false?' <span class=err>✘</span>':'';
 d.innerHTML=`<span class=t>${esc((e.ts||"").slice(11,23))}</span> <span class="a ${esc(e.agent)}">${esc(e.agent)}</span>${e.target?" → <span class='a "+esc(e.target)+"'>"+esc(e.target)+"</span>":""} <span class=k>[${esc(e.kind)}]</span> ${esc(e.text)}${ok}${e.data?`<span class=d>${esc(e.data)}</span>`:""}`;
 d.style.display=vis(d)?"":"none";log.appendChild(d);while(log.children.length>3000)log.firstChild.remove();if(as.checked)window.scrollTo(0,document.body.scrollHeight)}
-function go(){const es=new EventSource("/api/live/stream?backlog=150");es.onopen=()=>{st.textContent="● live";st.style.color="#3fb950"};
-es.onmessage=m=>{try{add(JSON.parse(m.data))}catch(_){}};es.onerror=()=>{st.textContent="● getrennt – neu verbinden…";st.style.color="#f85149"}}
+function go(){const es=new EventSource("/api/live/stream?backlog=150");es.onopen=()=>{st.textContent="● live";st.style.color="#0A6B22"};
+es.onmessage=m=>{try{add(JSON.parse(m.data))}catch(_){}};es.onerror=()=>{st.textContent="● getrennt – neu verbinden…";st.style.color="#9b1c1c"}}
 fetch("/api/live/config").then(r=>r.json()).then(c=>{if(!c.success||!c.agents)return;let css="";for(const[a,v]of Object.entries(c.agents)){if(/^[\w-]+$/.test(a)&&/^#[0-9a-fA-F]{3,6}$/.test(v.color||""))css+=`.${a}{background:${v.color}}`}
 const s=document.createElement("style");s.textContent=css;document.head.appendChild(s);if(c.title)document.querySelector("header b").textContent=c.title}).catch(()=>{});
 go();

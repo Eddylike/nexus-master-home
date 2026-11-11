@@ -24,8 +24,8 @@ class Base(unittest.TestCase):
         pa.CONTACTS_PATH = d / "apex" / "contacts.json"
         pa.CONTACTS_PATH.parent.mkdir(parents=True)
         pa.CONTACTS_PATH.write_text(json.dumps({"_info": "x", "contacts": [
-            {"example": True, "name": "Beispiel", "aliases": [], "whatsapp": "+4915100000000"},
-            {"name": "Mama", "aliases": ["mutti"], "whatsapp": "+4915111111111"}]}), encoding="utf-8")
+            {"example": True, "name": "Beispiel", "aliases": [], "whatsapp": "+491510000001"},
+            {"name": "Mama", "aliases": ["mutti"], "whatsapp": "+491510000002"}]}), encoding="utf-8")
 
     def tearDown(self):
         pa.DATA_DIR, pa.CONTACTS_PATH = self._old
@@ -66,7 +66,7 @@ class Contacts(Base):
         old = phone_actions.CONTACTS_PATH
         try:
             phone_actions.CONTACTS_PATH = pa.CONTACTS_PATH
-            self.post("/api/contacts", {"name": "Neu", "whatsapp": "+4915122222222"})
+            self.post("/api/contacts", {"name": "Neu", "whatsapp": "+491709876543"})
             names = [c["name"] for c in phone_actions._load_local_contacts()]
             self.assertIn("Mama", names)
             self.assertIn("Neu", names)

@@ -55,17 +55,6 @@ def run(master, text: str, session: dict) -> dict:
         rec = next((r for r in records if failed and r.get("id") == failed.task_id), {})
         gaps = [{"code": str(rec.get("error_code") or "LOCAL_STEP_FAILED"),
                  "detail": (failed.action + ": " if failed else "") + str(rec.get("error") or order.result)}]
-        if (failed and failed.action == "termux_phase_a_control" and rec.get("error_code") == "INVALID_REQUEST"
-                and "Phase-A control (127.0.0.1:8766 am Handy) antwortet nicht" in str(rec.get("error"))):
-            gaps = [{"code": "PHONE_PHASE_A_UNREACHABLE",
-                     "detail": "Die registrierte Health-Abfrage erreicht die Phase-A-Steuerung auf dem angeforderten Handy (127.0.0.1:8766) nicht. "
-                               "Handy-Ollama, Qwen3 und die Integration sind deshalb nicht geprüft; Bridge-Beleg: " + str(rec.get("id")) + "."}]
-        # Preserve uncertainty from older loaded outcome rules, while surfacing a
-        # concrete phone observation instead of substituting an unrelated error.
-        if rec.get("error_code") == "VERIFICATION_UNKNOWN" and rec.get("task") == "termux_phase_a_control":
-            observed = capability_gaps(plan, records)
-            if observed:
-                gaps = observed + gaps
     if not gaps:
         gaps = capability_gaps(plan, records)
     result = _response(order, plan, records, gaps)

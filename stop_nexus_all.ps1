@@ -1,6 +1,7 @@
-﻿param([string]$Root = $PSScriptRoot, [switch]$AllowLegacyIdleStop)
+param([string]$Root = $PSScriptRoot, [switch]$AllowLegacyIdleStop, [int]$DrainTimeoutSec = 90)
 # Stopfix 02.11.2026 (Nexus-Tools): 1) health_watch  2) Core (stop_nexus.ps1, Drain)  3) Gateway 8300  4) Pruefung
 # Gezielt per CommandLine (Dateiname + Root), nichts Fremdes. Ollama bleibt.
+# 2026-11-09: DrainTimeoutSec durchreichen (Restart-Hang = langer Drain bei laufender Arbeit).
 $ErrorActionPreference = "Stop"
 $pwsh = (Get-Process -Id $PID).Path
 $rootRx = [regex]::Escape([IO.Path]::GetFullPath($Root).TrimEnd('\'))
@@ -18,8 +19,9 @@ function Stop-NexusPy([string]$script, [string]$label) {
 # 1) health_watch zuerst, damit er den Core nicht wieder hochzieht
 Stop-NexusPy 'health_watch.py' 'health_watch'
 # 2) Core mit Drain (blockiert bei laufender Arbeit -> rc != 0, Gateway bleibt dann stehen)
-$stopArgs = @("-NoProfile", "-File", (Join-Path $Root "stop_nexus.ps1"), "-Root", $Root)
+$stopArgs = @("-NoProfile", "-File", (Join-Path $Root "stop_nexus.ps1"), "-Root", $Root, "-DrainTimeoutSec", "$DrainTimeoutSec")
 if ($AllowLegacyIdleStop) { $stopArgs += "-AllowLegacyIdleStop" }
+Write-Output ("stop_all: drain timeout={0}s" -f $DrainTimeoutSec)
 & $pwsh @stopArgs
 $rc = $LASTEXITCODE
 if ($rc -ne 0) { Write-Output ("ERROR core stop rc={0}; health_watch ist gestoppt, Gateway bleibt" -f $rc); exit $rc }

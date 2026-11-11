@@ -261,7 +261,10 @@ class NexusEngine:
     def _finalize(self, session: dict, reply: str, result: dict) -> dict:
         from nexus.master.evidence import guard_output
         identity = response_identity(result)
+        _thinking = str(result.get("thinking") or "")
         result = guard_output(result)
+        if _thinking and not result.get("thinking"):
+            result = {**result, "thinking": _thinking}
         reply = result.get("reply") or ""
         self._append_response(session, result, identity)
         return {
@@ -273,6 +276,7 @@ class NexusEngine:
             "model": result.get("model"),
             "error": result.get("error"),
             "data": result.get("data"),
+            "thinking": result.get("thinking") or "",
             **identity,
         }
 
@@ -289,6 +293,8 @@ class NexusEngine:
             "error": result.get("error"),
             **identity,
         })
+        if result.get("thinking"):  # THINK-04: Denkprozess im Verlauf speichern (nach Reload aufklappbar)
+            session["messages"][-1]["thinking"] = str(result.get("thinking"))
         session["updated"] = self._now()
         self._save_sessions()
 
@@ -306,13 +312,33 @@ class NexusEngine:
             self._append_response(session, result, identity)
             return {**result, **identity, "chat_session_id": chat_session_id, "chat_history_saved": True}
 
-    def _chat_impl(self, message: str, session_id: str | None = None, project_id: str | None = None, model: str | None = None) -> dict:
+    def append_game_turn(self, chat_session_id: str, speaker: str, content: str,
+                         partner: str = "nexus", role: str = "assistant", meta: dict | None = None) -> dict:
+        """2026-11-04 HAUS5T: Spielbeitrag (echte Agentenantwort) sichtbar in eine Chat-Sitzung schreiben."""
+        if role not in ("assistant", "system"):
+            raise ValueError("ROLE_NOT_ALLOWED")
+        with self._chat_lock, self._save_lock:
+            if chat_session_id not in self.sessions:
+                raise ValueError("CHAT_SESSION_NOT_FOUND")
+            session = self.sessions[chat_session_id]
+            p = partner if partner in ("nexus", "hermes", "gpt", "aether") else "nexus"
+            msg = {"role": "assistant", "content": str(content or ""), "ts": self._now(), "intent": "game",
+                   "source": "haus5t", "agent": str(speaker)[:40], "partner": p, "mode": "game",
+                   "data": meta if isinstance(meta, dict) else {}, "success": True}
+            session["messages"].append(msg)
+            session["updated"] = self._now()
+            self._save_sessions()
+            return {"success": True, "chat_session_id": chat_session_id, "count": len(session["messages"])}
+
+    def _chat_impl(self, message: str, session_id: str | None = None, project_id: str | None = None, model: str | None = None, source: str | None = None) -> dict:
         session = self._prepare_session(message, session_id, project_id)
+        if source:
+            session["request_source"] = str(source)
         ai_layer.apply_to_client(self.master.llm)
         use = ai_layer.resolve_chat_model(self.master.llm, override=model)
         if use:
             self.master.llm.model = use
-        result = self._route_order(message, session)
+        result = self._route_order(message, session, source=source)
         if result is None:
             result = self.master.handle(message, session["messages"][:-1])
         reply = result.get("reply") or ""
@@ -334,8 +360,13 @@ class NexusEngine:
         done_payload: dict[str, Any] | None = None
         _acc = ""
         _stream_hold = False
+        _think_acc: list[str] = []
         try:
             for ev in self.master.handle_stream(message, history):
+                if ev.get("type") == "thinking":  # THINK-02: Denkprozess separat, nie im Antworttext
+                    _think_acc.append(ev.get("text") or "")
+                    yield {"type": "thinking", "text": ev.get("text") or ""}
+                    continue
                 if ev.get("type") == "token":
                     # 2026-10-28 CHAT06: Tokens live weiterreichen; done.reply bleibt die validierte Endfassung
                     # Sobald der Text nach Erfolgs-/Task-Behauptung aussieht, nichts mehr live zeigen
@@ -367,15 +398,23 @@ class NexusEngine:
                 "intent": "chat",
                 "model": None,
             }
+        if _think_acc and not done_payload.get("thinking"):
+            done_payload["thinking"] = "".join(_think_acc).strip()
         reply = done_payload.get("reply") or ""
         finalized = self._finalize(session, reply, done_payload)
         yield {"type": "done", **finalized}
 
-    def _route_order(self, message, session):
+    def _route_order(self, message, session, source: str | None = None):
         from nexus.master.evidence import route_work
         self.master._persist_chat_order = self._save_sessions
         self.master._active_session_id = session.get("id") or self.session_id
         try:
+            src = str(source or session.get("request_source") or "").lower()
+            # 2026-11-09 FIXALL: Spiel/Probe nie in Hermes-Werkzeugvertraege ziehen.
+            if src in ("haus5t", "konzil", "game", "probe") or (
+                re.search(r"\b(rollenspiel|spielregeln|konzil der|haus der (?:fuenf|fünf) t(?:ue|ü)ren)\b", str(message or ""), re.I)
+            ):
+                return None
             from nexus.chat.collaboration import matches, collaborate
             if matches(message, session):
                 return collaborate(self.master, message, session)
@@ -383,9 +422,9 @@ class NexusEngine:
         finally:
             del self.master._persist_chat_order
 
-    def chat(self, message, session_id=None, project_id=None, model=None):
+    def chat(self, message, session_id=None, project_id=None, model=None, source=None):
         with self._chat_lock:
-            return self._chat_impl(message, session_id, project_id, model)
+            return self._chat_impl(message, session_id, project_id, model, source=source)
 
     def chat_stream(self, message, session_id=None, project_id=None, model=None, rewrite=None):
         with self._chat_lock:
