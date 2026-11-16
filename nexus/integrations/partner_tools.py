@@ -185,7 +185,7 @@ def run(agent: str, tool: str, args: dict | None = None) -> dict:
     return out
 
 
-def native_loop(agent: str, task: str, system: str, model: str = "qwen3.5:9b", max_turns: int = 4, timeout: int = 150) -> dict:
+def native_loop(agent: str, task: str, system: str, model: str = "qwen3.5:9b", max_turns: int = 4, timeout: int = 240) -> dict:
     """Ollama-native Tool-Loop nur mit den gemeinsamen Web-Tools (fuer Chat von GPT/AETHER)."""
     from nexus.common.ai_layer import keep_alive_value, load_config, ollama_base_url, unified_num_ctx
     cfg = load_config()

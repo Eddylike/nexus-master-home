@@ -179,8 +179,9 @@ def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx
             r = _web(text)
             if r is not None:
                 return r
-        except Exception:
-            pass
+        except Exception as exc:  # ehrlich melden, kein Chat-Fallback ohne Web
+            return {**_base(), "success": False, "reply": "", "mode": "local/ollama+web", "error": "GPT_WEB_TOOLS_FAILED",
+                    "error_type": type(exc).__name__}
     return _ask_base(message, _model, fmt=fmt, num_ctx=num_ctx, system=system)
 
 
@@ -192,8 +193,9 @@ def tool_ask(task: str) -> dict[str, Any]:
             if r is not None:
                 r["tool"] = "web"
                 return r
-        except Exception:
-            pass
+        except Exception as exc:
+            return {**_base(), "success": False, "tool": "web", "reply": "", "error": "GPT_WEB_TOOLS_FAILED",
+                    "error_type": type(exc).__name__}
     tok = _IN_TOOL.set(True)
     try:
         return _tool_ask_base(task)

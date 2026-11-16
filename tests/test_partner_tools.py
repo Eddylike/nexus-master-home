@@ -1,5 +1,11 @@
 """2026-11-16: gleiche Web-/Browser-Rechte fuer NEXUS, Hermes, NEXUS GPT, AETHER (offline)."""
+import pytest
 from nexus.integrations import partner_tools as pt
+
+
+@pytest.fixture(autouse=True)
+def _tmp_audit(tmp_path, monkeypatch):
+    monkeypatch.setattr(pt, 'AUDIT', tmp_path / 'audit.jsonl')  # echtes Audit-Log nicht verschmutzen
 
 
 def test_rights_equal_for_all_agents():

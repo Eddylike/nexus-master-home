@@ -117,6 +117,7 @@ def ask(message: str) -> dict[str, Any]:
                     ok = bool(reply) and not nl.get("final_missing") and (not calls or any(c.get("ok") for c in calls))
                     return {**_base(), "success": ok, "reply": reply, "mode": "chat+web", "tool_calls": calls,
                             "error": None if ok else "AETHER_WEB_TOOLS_FAILED"}
-        except Exception as exc:  # ehrlich: Fallback auf normalen Chat
-            _web_err = type(exc).__name__
+        except Exception as exc:  # ehrlich melden, KEIN Fallback auf Chat ohne Web (sonst erfundene URLs)
+            return {**_base(), "success": False, "reply": "", "mode": "chat+web",
+                    "error": "AETHER_WEB_TOOLS_FAILED", "error_type": type(exc).__name__}
     return _ask_base(message)
