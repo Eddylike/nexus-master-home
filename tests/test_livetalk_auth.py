@@ -5,7 +5,7 @@ from nexus.livetalk import auth
 def test_network_rules():
     assert auth.is_allowed_client("127.0.0.1", {})
     assert auth.is_allowed_client("192.0.2.40", {})
-    assert auth.is_allowed_client("192.0.2.15", {})
+    assert auth.is_allowed_client("100.99.208.5", {})
     assert not auth.is_allowed_client("8.8.8.8", {})
     assert not auth.is_allowed_client("192.0.2.40", {"X-Forwarded-For": "1.2.3.4"})
     assert not auth.is_allowed_client("127.0.0.1", {"Tailscale-User-Login": "x"})

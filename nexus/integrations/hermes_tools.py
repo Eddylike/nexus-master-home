@@ -463,3 +463,24 @@ WANTS = _nexus_intent_re.compile(
     r"datei|dateien)\b|\w*datei\w*",
     _nexus_intent_re.IGNORECASE
 )
+
+
+# NEXUS_PARTNER_WEB_20261116: gleiche Web-/Browser-Rechte fuer alle Agenten (Eddie 11.11.)
+from nexus.integrations import partner_tools as _pt
+TOOLS = TOOLS + [x for x in _pt.SCHEMAS if x["function"]["name"] not in {t["function"]["name"] for t in TOOLS}]
+_run_tool_base = run_tool
+_wants_tools_base = wants_tools
+
+
+def run_tool(name: str, args: dict, wd: Path) -> str:
+    if name in _pt.SHARED_TOOLS:
+        r = _pt.run("hermes", name, args)
+        out = json.dumps(r, ensure_ascii=False)[:MAX_READ]
+        if not r.get("success"):
+            raise RuntimeError(out)
+        return out
+    return _run_tool_base(name, args, wd)
+
+
+def wants_tools(task: str) -> bool:
+    return bool(_wants_tools_base(task) or _pt.wants_web(task or ""))

@@ -500,7 +500,104 @@
   }
 
   /* 20261102 Nexus-UI: Szene selten nicht gebaut -> Start wiederholen, bis #nxReferenceScene steht; Grund in body[data-glass-boot] */
-  function boot(n) {
+  
+/* KI-Team Ansicht Rendering (Phase C)
+   Zeigt 4 Agentenkarten mit echten Daten.
+   Farben und Stil orientieren sich an 35153.jpg (Babyblau/Cyan). */
+
+function renderKiTeam() {
+  // API-Daten laden und 4 Agenten darstellen
+  const agents = [
+    { id: "nexus", name: "NEXUS", role: "Zentrale KI-Hub-Steuerung", status: "aktiv", output: "System online" },
+    { id: "hermes", name: "Hermes", role: "Planung & Ausführung", status: "wartet", output: "—" },
+    { id: "gpt", name: "NEXUS GPT", role: "Chat & Analyse", status: "offline", output: "—" },
+    { id: "aether", name: "AETHER", role: "Forschungs-Partner", status: "offline", output: "—" }
+  ];
+
+  const container = document.getElementById("kiTeamCards");
+  if (!container) return;
+
+  container.innerHTML = agents.map(ag => `
+    <div class="ki-agent-card" style="
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--border-radius);
+      padding: 12px;
+      margin: 8px;
+      color: var(--text-on-dark);
+      float: left;
+      width: 22%;
+      min-height: 140px;
+    ">
+      <div class="agent-header" style="font-weight: 600; font-size: 13px; margin-bottom: 8px;">
+        ${ag.name}
+      </div>
+      <div class="agent-role" style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">
+        ${ag.role}
+      </div>
+      <div class="agent-status-bar" style="
+        width: 100%;
+        height: 8px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+        margin-top: 8px;
+        overflow: hidden;
+      ">
+        <div class="agent-status-fill" style="
+          width: ${ag.status === "aktiv" ? "100%" : "0%"};
+          height: 100%;
+          background: var(--accent);
+          transition: width 0.3s ease;
+        "></div>
+      </div>
+      <div class="agent-output" style="
+        font-size: 10px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        white-space: pre;
+        max-height: 30px;
+        overflow: auto;
+      ">${ag.output}</div>
+    </div>
+  `);
+}
+
+/* KI-Team in Sidebar-Navigation integrieren */
+function initKiTeamNav() {
+  const sideNav = document.getElementById("sideNav");
+  if (!sideNav) return;
+
+  // Prüfen ob Button schon existiert
+  if (document.getElementById("kiTeamNavBtn")) return;
+
+  const kiBtn = document.createElement("button");
+  kiBtn.id = "kiTeamNavBtn";
+  kiBtn.type = "button";
+  kiBtn.className = "nav-glass-button";
+  kiBtn.textContent = "KI-Team";
+  kiBtn.style.margin = "2px 0";
+  kiBtn.onclick = () => {
+    const card = document.getElementById("nxKiTeam");
+    if (card) {
+      card.style.display = card.style.display === "none" ? "block" : "none";
+    }
+  };
+
+  // Füge nach dem Agenten-Button ein
+  const agentBtn = sideNav.querySelector("button[data-view='crew']");
+  if (agentBtn) {
+    sideNav.insertBefore(kiBtn, agentBtn.nextSibling);
+  }
+}
+
+/* Beim Laden initialisieren - durch __nxStableLoad ausgelöst */
+if (window.__nxStableLoad && window.__nxStableLoad.push) {
+  window.__nxStableLoad.push(() => {
+    renderKiTeam();
+    initKiTeamNav();
+  });
+}
+function boot(n) {
     let why = "ok";
     try {
       if (!byId("nxAiRoom")) why = "kein nxAiRoom";

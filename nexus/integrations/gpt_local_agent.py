@@ -31,7 +31,8 @@ def preferred_model() -> str:
 SYSTEM_PROMPT = (
     "Du bist NEXUS GPT in NEXUS Master Home und laeufst lokal ueber Ollama (kein OpenAI). "
     "Schwerpunkte: Aufgabenplanung, Analyse, Wissen, Beratung. Plaene als nummerierte, pruefbare Schritte. "
-    "Behaupte niemals, Werkzeuge, Dateien oder Systeme benutzt zu haben. Erfinde keine Ergebnisse. Antworte kurz auf Deutsch. "
+    "Behaupte niemals, Werkzeuge, Dateien oder Systeme benutzt zu haben, die du nicht wirklich per tool_call benutzt hast. Erfinde keine Ergebnisse. Antworte kurz auf Deutsch. "
+    "Du hast dieselben Web-/Browser-Werkzeuge wie das ganze Team (web_search, fetch_url, open_url, close_opened). "
     "LEITBILD: NEXUS Master Home soll zeigen, dass Mensch und Maschine zusammen stark sind, und die Welt fuer jeden besser machen. Es verbindet Mensch und Maschine und auch Menschen untereinander. Es vermittelt die richtigen Werte: Ehrlichkeit, Schutz, Hilfsbereitschaft, Fuersorge, gute Zusammenarbeit und Freundschaft. Es bleibt kostenlos und lokal zuerst."
 )
 
@@ -147,3 +148,54 @@ def tool_ask(task: str) -> dict[str, Any]:
             "command": cmd, "why": why, "terminal": {k: res.get(k) for k in ("run", "status", "returncode", "stdout", "stderr", "sec",
                                                                               "level_required", "level_agent", "approval_id")},
             "reply": summary.get("reply") or "", "error": None if res.get("ok") else (res.get("error") or ",".join(res.get("reasons") or []))}
+
+
+# --- 2026-11-16 Eddie 11.11.: gleiche Rechte fuer alle Agenten (Web/Browser) ---
+import contextvars as _cv
+_IN_TOOL = _cv.ContextVar("gpt_in_tool", default=False)
+_ask_base = ask
+_tool_ask_base = tool_ask
+
+
+def _web(text: str) -> dict[str, Any] | None:
+    from nexus.integrations import partner_tools as _pt
+    if not _pt.wants_web(text):
+        return None
+    nl = _pt.native_loop("gpt", text, SYSTEM_PROMPT, model=preferred_model())
+    calls = nl.get("tool_calls") or []
+    reply = str(nl.get("reply") or "").strip()
+    if not (calls or reply):
+        return None
+    ok = bool(reply) and not nl.get("final_missing") and (not calls or any(c.get("ok") for c in calls))
+    return {**_base(), "model": preferred_model(), "mode": "local/ollama+web", "source": "gpt_local", "success": ok,
+            "reply": reply, "tool_calls": calls, "error": None if ok else "GPT_WEB_TOOLS_FAILED"}
+
+
+def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx: int | None = None,
+        system: str | None = None) -> dict[str, Any]:
+    text = (message or "").strip()
+    if text and not _IN_TOOL.get() and _model is None and fmt is None and system is None:
+        try:
+            r = _web(text)
+            if r is not None:
+                return r
+        except Exception:
+            pass
+    return _ask_base(message, _model, fmt=fmt, num_ctx=num_ctx, system=system)
+
+
+def tool_ask(task: str) -> dict[str, Any]:
+    text = (task or "").strip()
+    if text:
+        try:
+            r = _web(text)
+            if r is not None:
+                r["tool"] = "web"
+                return r
+        except Exception:
+            pass
+    tok = _IN_TOOL.set(True)
+    try:
+        return _tool_ask_base(task)
+    finally:
+        _IN_TOOL.reset(tok)

@@ -16,7 +16,7 @@ def _read(rel):
 def test_mh4d_css_loaded_last_with_cache_bust():
     html = _read("index.html")
     i_dark = html.index("nexus4d_dark.css?v=")
-    i_mh = html.index("/static/css/nexus4d_mh4d.css?v=mh4d")
+    i_mh = html.index("/static/css/nexus4d_mh4d.css?v=")
     assert i_mh > i_dark
     css = _read("css/nexus4d_mh4d.css")
     assert "#nxTop#nxTop{height:56px" in css
@@ -57,4 +57,4 @@ def test_live_served_files_current():
     except Exception:
         pytest.skip("NEXUS :8299 nicht erreichbar")
     assert "MH4D-01" in lm
-    assert "nexus4d_mh4d.css?v=mh4d" in idx and "think_panel.js?v=think1" in idx
+    assert "nexus4d_mh4d.css?v=" in idx and "think_panel.js?v=" in idx

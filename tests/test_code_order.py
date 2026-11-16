@@ -310,6 +310,17 @@ class CodeOrderRunTests(unittest.TestCase):
         patcher = mock.patch("nexus.integrations.hermes_client.invoke", self.bridge)
         patcher.start()
         self.addCleanup(patcher.stop)
+        # Belege kommen aus dem FakeBridge, nicht von der Platte (workspace/bridge/tasks
+        # wird archiviert und darf den Test nicht beeinflussen).
+        def _fake_record(task_id, root=None):
+            if not str(task_id).startswith("NX-20261009-"):
+                return {}
+            idx = int(str(task_id).rsplit("-", 1)[1]) - 1
+            op, task = self.bridge.calls[idx] if idx < len(self.bridge.calls) else ("submit", "unknown")
+            return {"id": task_id, "task": task, "status": "succeeded"}
+        rec = mock.patch("nexus.master.evidence.persisted_task", _fake_record)
+        rec.start()
+        self.addCleanup(rec.stop)
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)

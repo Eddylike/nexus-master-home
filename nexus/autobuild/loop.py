@@ -1213,6 +1213,21 @@ class Autobuild:
     def _cycle(self, item_id, full_suite) -> dict:
         cid = datetime.now().strftime("%Y%m%d_%H%M%S")
         rec: dict[str, Any] = {"cycle": cid, "ts": _now()}
+        # Phase 8: Vulnerabilitätserkennung am Zyklus-Anfang
+        try:
+            items = load_backlog()
+            recurring = [i for i in items if i.get("auto_key") and i.get("count", 0) >= 2 and str(i.get("status")) == "offen"]
+            if recurring:
+                rec["vulnerability_warning"] = f" {len(recurring)} wiederkehrende Fehler erkannt"
+                _emit("NEXUS", "analysis", f"Wiederkehrende Fehler erkannt: {len(recurring)} offene Punkte")
+                # Protokolliere an Dashboard
+                from nexus.dashboard import log_error
+                for r in recurring[:3]:
+                    log_error(f"SB-AUTO-{r['id']}", r.get("title", "Unbekannt"), str(r.get("logs", [])[:200]))
+            else:
+                rec["vulnerability_warning"] = None
+        except Exception as e:
+            rec["vulnerability_warning"] = f"check_failed:{e}"
         try:
             self._flush_pending()
         except Exception:

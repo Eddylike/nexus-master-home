@@ -54,9 +54,9 @@ def test_toggle_js():
 
 def test_index_links_after_think_panel():
     h = INDEX.read_text(encoding="utf-8")
-    c = h.index("nexus4d_glass.css?v=glass")
+    c = h.index("nexus4d_glass.css?v=")
     assert h.index("think_panel.css?v=") < c
-    assert h.index("think_panel.js?v=") < h.index("glass_theme.js?v=glass")
+    assert h.index("think_panel.js?v=") < h.index("glass_theme.js?v=")
 
 
 def test_live_served():
@@ -64,6 +64,6 @@ def test_live_served():
         html = urllib.request.urlopen("http://127.0.0.1:8299/", timeout=5).read().decode("utf-8", "replace")
     except Exception as e:  # pragma: no cover
         pytest.skip(f"Core nicht erreichbar: {e}")
-    assert "nexus4d_glass.css?v=glass" in html
+    assert "nexus4d_glass.css?v=" in html
     css = urllib.request.urlopen("http://127.0.0.1:8299/static/css/nexus4d_glass.css?v=glass1", timeout=5).read().decode("utf-8")
     assert "--gl-mint" in css

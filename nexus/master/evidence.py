@@ -151,27 +151,49 @@ def capability_snapshot(root=ROOT):
         ('drive','Google Drive',False,None,None,'Browser-Link vorhanden; authentifizierte Datei-Werkzeuge nicht nachgewiesen.'),
         ('calendar','Kalender',False,None,None,'Browser-Link vorhanden; authentifizierte Kalender-Werkzeuge nicht nachgewiesen.'),
         ('github','GitHub',False,None,None,'Lokale Git-Aufträge sind keine nachgewiesene GitHub-API-Anbindung.'),
-        ('voice','Sprachsteuerung',(root/'nexus/voice/voice_manager.py').is_file(),None,None,'Implementierung vorhanden; Mikrofon, Spracherkennung und Ausgabe hier nicht live geprüft.'),
+        ('voice','Sprachsteuerung',(root/'nexus/voice/voice_manager.py').is_file(),None,None,'Server-STT (faster-whisper) und TTS; Nachweis = echte Audiodatei transkribiert.'),
         ('phone','Smartphone-Anbindung','android_devices' in TASK_PERMISSIONS,None,None,'Registriert; hier weder abgefragt noch verändert.'),
         ('agents','Autonome Agenten',(root/'nexus/crew/runner.py').is_file(),None,None,'Crew-Implementierung vorhanden; unbegrenzte Autonomie nicht nachgewiesen.'),
         ('skills','Skill-Erstellung',False,None,None,'Vorhandene Skill-Liste dient der Entdeckung; kein geprüfter Erstellungs-/Aktivierungsablauf.'),
         ('improve','Selbstverbesserung',(root/'nexus/memory/self_improve.py').is_file(),None,None,'Vorschlagsliste vorhanden; produktive Änderungen benötigen separate Prüfung und Freigabe.'),
-        ('web','Web-Recherche','web_search' in KNOWN_TOOLS,None,None,'Recherchewerkzeug registriert; Live-Verfügbarkeit in diesem Bericht nicht geprüft.')]
+        ('web','Web-Recherche','web_search' in KNOWN_TOOLS,None,None,'Recherchewerkzeug registriert; Live-Suche wird bei jeder Statusabfrage real ausgeführt.')]
+    live={}
+    if health.get('success'):
+        from nexus.master.capability_probe import run_probes
+        live=run_probes(root).get('probes',{})
     rows=[]
     for key,label,registered,reachable,tested,note in definitions:
+        probe=live.get(key)
+        task_ids=[r['id'] for r in records] if key=='files' and file_test else []
+        provenance='registry_and_persisted_receipts' if key=='files' else 'source_registration_only'
+        if probe:
+            if probe.get('reachable') is not None: reachable=probe['reachable']
+            if probe.get('tested') is not None: tested=probe['tested']
+            task_ids=list(probe.get('task_ids') or [])+task_ids
+            provenance='live_probe'+('_and_persisted_evidence' if probe.get('evidence') else '')
+            if probe.get('error'): note=note+f" Letzte Probe: Fehler {probe['error']}."
+            elif probe.get('tested') is False and key in ('browser','voice','agents'):
+                note=note+' Live-Nachweis (capability-'+key+'-*.json) fehlt oder ist älter als 30 Tage.'
         rows.append({'id':key,'name':label,'registered':registered,'reachable':reachable,
                      'tested':tested,'ready':bool(registered and reachable is True and tested is True),
-                     'scope':note,'evidence_task_ids':[r['id'] for r in records] if key=='files' and file_test else [],
-                     'provenance':'registry_and_persisted_receipts' if key=='files' else 'source_registration_only'})
-    return {'capabilities':rows,'bridge_reachable':bool(health.get('success')),
-            'note':'Registriert ist kein Ausführungsnachweis. UNKNOWN bedeutet nicht geprüft.'}
+                     'scope':note,'evidence_task_ids':task_ids,'provenance':provenance,
+                     'probe':{k:v for k,v in (probe or {}).items() if k not in ('id',)} if probe else None})
+    probe_ids=[i for r in rows for i in r['evidence_task_ids'] if i]
+    return {'capabilities':rows,'bridge_reachable':bool(health.get('success')),'live_probe':bool(live),
+            'probe_task_ids':probe_ids,
+            'note':'Registriert ist kein Ausführungsnachweis. UNKNOWN bedeutet nicht geprüft. '
+                   'Ja bei getestet/einsatzbereit stammt aus einer echten Probe (max. 10 Min alt) oder einem gespeicherten PASS-Beleg.'}
 
 def capability_text(snapshot):
     def flag(value): return 'UNKNOWN' if value is None else ('ja' if value else 'nein')
     lines=['Fähigkeiten – quellenbasierter Status:']
     for row in snapshot['capabilities']:
         lines.append(f"- {row['name']}: registriert={flag(row['registered'])}, erreichbar={flag(row['reachable'])}, getestet={flag(row['tested'])}, einsatzbereit={flag(row['ready'])}. {row['scope']}")
-    lines.append('Keine neue Task-ID: Diese Auskunft führt keinen Arbeitsauftrag aus.')
+    ids=snapshot.get('probe_task_ids') or []
+    if snapshot.get('live_probe'):
+        lines.append('Live-Probe ausgeführt; Beleg-Task-IDs: '+(', '.join(ids) if ids else 'keine')+'.')
+    else:
+        lines.append('Keine Live-Probe (Bridge nicht erreichbar); keine neue Task-ID.')
     return '\n'.join(lines)
 
 def development_report(root=ROOT):

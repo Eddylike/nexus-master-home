@@ -202,12 +202,25 @@ try {
   Write-Log "start: $py `"$server`" out=$serverOut err=$serverErr"
   $argList = if ($py -match '(?i)py\.exe$') { @('-3','-B','-u', $server) } else { @('-B','-u', $server) }
   Write-Log ("std_handle_inheritance_cleared={0}" -f (Disable-NexusStdHandleInheritance))
-  $proc = Start-Process -FilePath $py -ArgumentList $argList -WorkingDirectory $Root `
-    -WindowStyle Hidden -RedirectStandardOutput $serverOut -RedirectStandardError $serverErr `
-    -PassThru
-  Set-Content -Path $pidFile -Value $proc.Id -Encoding ASCII
-  try { $proc.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal; Write-Log "priority=BelowNormal" } catch { Write-Log ("priority set failed: {0}" -f $_.Exception.Message) }
-  Write-Log ("started pid={0}" -f $proc.Id)
+  # Pipefix 16.11.2026 (Nexus-Tools): KEIN Start-Process -Redirect* mehr - vererbt die Pipe des Aufrufers trotz
+  # Disable-NexusStdHandleInheritance (Trockentest belegt). ShellExecute (Start-Process ohne Umleitung) auf cmd.exe,
+  # cmd leitet in Logdateien auf G: um. Env und Arbeitsverzeichnis ($Root) erbt das Kind.
+  $cmdArgs = ($argList | ForEach-Object { '"{0}"' -f $_ }) -join ' '
+  $launcher = Start-Process -FilePath $env:ComSpec -ArgumentList ('/d /c ""{0}" {1} 1>"{2}" 2>"{3}""' -f $py, $cmdArgs, $serverOut, $serverErr) -WorkingDirectory $Root -WindowStyle Hidden -PassThru
+  Write-Log ("launcher=cmd pid={0}" -f $launcher.Id)
+  # Server-PID frueh als Kind des Launchers (fuer pidFile/Prioritaet), nach Readiness Abgleich mit dem Listener auf $Port
+  $serverPid = 0
+  $pidDeadline = (Get-Date).AddSeconds(10)
+  while ($serverPid -eq 0 -and (Get-Date) -lt $pidDeadline) {
+    $kid = @(Get-OwnedServer | Where-Object { [int]$_.ParentProcessId -eq [int]$launcher.Id } | Select-Object -First 1)
+    if ($kid.Count -gt 0) { $serverPid = [int]$kid[0].ProcessId } else { Start-Sleep -Milliseconds 300 }
+  }
+  function Set-ServerPid([int]$id) {
+    Set-Content -Path $pidFile -Value $id -Encoding ASCII
+    try { (Get-Process -Id $id).PriorityClass = [System.Diagnostics.ProcessPriorityClass]::BelowNormal; Write-Log "priority=BelowNormal" } catch { Write-Log ("priority set failed: {0}" -f $_.Exception.Message) }
+    Write-Log ("started pid={0}" -f $id)
+  }
+  if ($serverPid -gt 0) { Set-ServerPid $serverPid } else { Write-Log "WARN server pid not found as launcher child; using port listener after readiness" }
 
   $ok = $false
   $readinessTimer = [System.Diagnostics.Stopwatch]::StartNew()
@@ -218,7 +231,14 @@ try {
   }
 
   $owned = @(Get-OwnedServer)
-  if ($owned.Count -ne 1 -or [int]$owned[0].ProcessId -ne [int]$proc.Id) {
+  $listener = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
+  if ($listener.Count -gt 0) {
+    $listenerPid = [int]$listener[0].OwningProcess
+    Write-Log ("listener port={0} pid={1}" -f $Port, $listenerPid)
+    if ($serverPid -eq 0) { $serverPid = $listenerPid; Set-ServerPid $serverPid }
+    elseif ($listenerPid -ne $serverPid) { Write-Log ("WARN listener pid={0} differs from launcher child pid={1}" -f $listenerPid, $serverPid) }
+  }
+  if ($owned.Count -ne 1 -or [int]$owned[0].ProcessId -ne [int]$serverPid) {
     Write-Log "BLOCKED: process identity/single-instance verification failed; no process terminated"
     exit 14
   }

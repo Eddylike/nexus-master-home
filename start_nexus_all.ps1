@@ -31,11 +31,14 @@ function Test-Ollama {
     return ($null -ne $r.PSObject.Properties["models"])
   } catch { return $false }
 }
+# Inheritfix 16.11.2026: Vererbung der Std-Handles VOR jedem Kindprozess (Ollama, start_nexus, Gateway) abschalten.
+$inheritCleared = Disable-NexusStdHandleInheritance
 $controlLock = $null
 $ollamaLock = $null
 try {
   $controlLock = [IO.File]::Open((Join-Path $logDir "nexus_control.lock"),"OpenOrCreate","ReadWrite","None")
   Log "START local NEXUS; Funnel is independent"
+  Log ("std_handle_inheritance_cleared={0} (vor Ollama/Kindprozessen)" -f $inheritCleared)
   $ollamaLock = New-Object Threading.Mutex($false, "Local\NexusOllamaStart")
   $locked = $false
   try {
@@ -62,8 +65,12 @@ try {
       try {
         $env:OLLAMA_MODELS = "G:\Ollama\models"
         $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
-        $process = Start-Process -FilePath $ollamaExe -ArgumentList "serve" -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logDir "ollama-$stamp.out.log") -RedirectStandardError (Join-Path $logDir "ollama-$stamp.err.log")
-        Log ("OLLAMA started once pid={0} models=G:\Ollama\models" -f $process.Id)
+        $null = Disable-NexusStdHandleInheritance  # Inheritfix 16.11.: Ollama erbt keine Aufrufer-Pipes
+        # Inheritfix 16.11.: Start-Process mit -Redirect* vererbt trotz Disable die Pipe des Aufrufers (Trockentest belegt),
+        # daher ShellExecute (Start-Process OHNE Redirect, keine Handle-Vererbung) auf cmd.exe; cmd leitet in Logdateien auf G: um.
+        $oOut = Join-Path $logDir "ollama-$stamp.out.log"; $oErr = Join-Path $logDir "ollama-$stamp.err.log"
+        $process = Start-Process -FilePath $env:ComSpec -ArgumentList ('/d /c ""{0}" serve 1>"{1}" 2>"{2}""' -f $ollamaExe, $oOut, $oErr) -WindowStyle Hidden -PassThru
+        Log ("OLLAMA started once launcher=cmd pid={0} models=G:\Ollama\models" -f $process.Id)
       } finally { $env:OLLAMA_MODELS = $oldModels }
       $deadline = (Get-Date).AddSeconds(30)
       while (-not (Test-Ollama) -and (Get-Date) -lt $deadline -and -not $process.HasExited) {
@@ -71,6 +78,7 @@ try {
         $process.Refresh()
       }
       if (-not (Test-Ollama)) { Log "ERROR Ollama readiness failed; see timestamped logs"; exit 21 }
+      Log ("OLLAMA ready pid={0}" -f ((@(Get-NetTCPConnection -LocalPort 11434 -State Listen -ErrorAction SilentlyContinue) | Select-Object -First 1).OwningProcess))
     }
   } finally { if ($locked) { $ollamaLock.ReleaseMutex() } }
   $pwsh = (Get-Process -Id $PID).Path
@@ -83,10 +91,13 @@ try {
     $gw = Join-Path $Root "nexus\bridge_gateway\gateway_allowlist.py"
     $gl = Join-Path $Root "logs\bridge"
     $null = Disable-NexusStdHandleInheritance
-    $gp = Start-Process -FilePath $py -ArgumentList "`"$gw`"" -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $gl "gateway-stdout.log") -RedirectStandardError (Join-Path $gl "gateway-stderr.log")
+    # Pipefix 16.11.2026: ShellExecute auf cmd.exe statt Start-Process -Redirect* (keine Pipe-Vererbung); Logs auf G:
+    New-Item -ItemType Directory -Force -Path $gl | Out-Null
+    $gp = Start-Process -FilePath $env:ComSpec -ArgumentList ('/d /c ""{0}" "{1}" 1>"{2}" 2>"{3}""' -f $py, $gw, (Join-Path $gl "gateway-stdout.log"), (Join-Path $gl "gateway-stderr.log")) -WorkingDirectory $Root -WindowStyle Hidden -PassThru
     $gd = (Get-Date).AddSeconds(20)
     while (-not (Get-NetTCPConnection -LocalPort 8300 -State Listen -ErrorAction SilentlyContinue) -and (Get-Date) -lt $gd) { Start-Sleep -Milliseconds 500 }
-    if (Get-NetTCPConnection -LocalPort 8300 -State Listen -ErrorAction SilentlyContinue) { Log ("GATEWAY started pid={0}" -f $gp.Id) } else { Log "ERROR gateway 8300 not listening" }
+    $gwL = @(Get-NetTCPConnection -LocalPort 8300 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1)
+    if ($gwL.Count -gt 0) { Log ("GATEWAY started pid={0} launcher=cmd pid={1}" -f $gwL[0].OwningProcess, $gp.Id) } else { Log "ERROR gateway 8300 not listening" }
   } else { Log "REUSED gateway 8300" }
   Log "START local verified; no Funnel configuration changed"
   exit 0

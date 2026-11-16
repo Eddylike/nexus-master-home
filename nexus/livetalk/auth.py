@@ -1,7 +1,7 @@
 """LT-08: Zugang fuer Live Talk.
 
 Erlaubt sind nur direkte Verbindungen aus localhost, Heim-LAN (192.168/16, 10/8, 172.16/12) und Tailscale
-(192.0.2.11/10, fd7a:115c:a1e0::/48); Proxy-/Funnel-Header werden abgewiesen.
+(100.64/10, fd7a:115c:a1e0::/48); Proxy-/Funnel-Header werden abgewiesen.
 Ausserhalb von localhost ist ein Token noetig:
   - das bestehende NEXUS-OS-Pairing-Token der App (pc_remote, Bearer) ODER
   - ein eigenes Live-Talk-Geraetetoken fuer den Handy-Browser, ausgegeben gegen einen 6-stelligen Code,

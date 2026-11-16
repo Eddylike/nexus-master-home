@@ -961,3 +961,83 @@ body.nx-app.nx-desktop-bg .msg.user .bubble{
   background:rgba(0,0,0,.25);color:var(--fg);white-space:pre-wrap;word-break:break-word;
   font:12px/1.45 Consolas,"Cascadia Mono",monospace;max-height:260px;overflow:auto;
 }
+
+/* --- Glass Navigation (Phase B) --- */
+.glass-nav {}
+
+/* Haupt-Navigation (sichtbar auf Desktop) */
+#sideNav .nav-glass-button {
+  width: 100%;
+  padding: 10px 14px;
+  margin: 2px 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-on-dark);
+  border-radius: var(--border-radius);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+#sideNav .nav-glass-button:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+#sideNav .nav-glass-button.active {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Gruppentrennlinien */
+#sideNav .nav-sep {
+  height: 1px;
+  margin: 8px 6px;
+  background: linear-gradient(90deg, transparent, var(--text-muted), transparent);
+}
+
+/* More-Dropdown Navigation */
+#sideMore .nav-glass-button {
+  width: 100%;
+  padding: 10px 14px;
+  margin: 2px 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-on-dark);
+  border-radius: var(--border-radius);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+#sideMore .nav-glass-button:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Navigation Groups - Labels */
+.nav-group-label {
+  padding: 8px 14px;
+  margin: 8px 0 4px;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+/* ZENTRALE Gruppe styling - marker */
+.nav-group-zentrale { color: var(--accent); }
+.nav-group-arbeitsbereiche { color: var(--accent-cyan); }
+.nav-group-kommunikation { color: var(--text-secondary); }
+.nav-group-kaerheit { color: var(--text-secondary); } /* KREATIVITÄT */
+.nav-group-verwaltung { color: var(--accent-cyan); }

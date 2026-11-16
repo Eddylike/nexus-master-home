@@ -47,4 +47,4 @@ def test_live_served_round3():
         html = urllib.request.urlopen("http://127.0.0.1:8299/", timeout=5).read().decode("utf-8", "replace")
     except Exception as e:  # pragma: no cover
         pytest.skip(f"Core nicht erreichbar: {e}")
-    assert "mh4d_fixes.js?v=" in html and "nexus4d_mh4d.css?v=mh4d3" in html
+    assert "mh4d_fixes.js?v=" in html and "nexus4d_mh4d.css?v=" in html

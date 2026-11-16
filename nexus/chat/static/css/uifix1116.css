@@ -1,0 +1,13 @@
+/* uifix1116 (Nexus-UI, 16.11.2026): nur Lesbarkeit + Lage, Optik unveraendert */
+/* 1) helle Karten in Panels: dunkle Schrift statt hell-auf-hell */
+html body#nxBody#nxBody#nxBody.nx-app .workspace-panel :is(.file-row,.mem-item,.skill-item,.project-row,.activity-item,.activity-current,.master-card,#masterResult,.perf-proc-wrap,.nxm-playlist,th,li.ok,li.crit,li.warn),
+html body#nxBody#nxBody#nxBody.nx-app .workspace-panel :is(.file-row,.mem-item,.skill-item,.project-row,.activity-item,.activity-current,.master-card,#masterResult,.perf-proc-wrap,.nxm-playlist,li.ok,li.crit,li.warn) :not(button):not(.btn):not(.chip):not(svg):not(path){color:#12324e!important;text-shadow:none!important}
+/* 2) Systemdetails: Popup haengt sauber unter dem Knopf (kein fixed in skalierter Buehne) */
+html body#nxBody#nxBody#nxBody.nx-app #nxGlassSystemControls{position:relative!important}
+html body#nxBody#nxBody#nxBody.nx-app #nxGlassSystemControls[open]>.nx-glass-system-controls{position:absolute!important;top:calc(100% + 8px)!important;right:0!important;left:auto!important;width:max-content!important;min-width:200px!important;max-width:min(420px,calc(100vw - 32px))!important;max-height:60vh!important;overflow:auto!important;z-index:10000!important}
+/* Systemwerte in der Sidebar unter System */
+html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem{display:block!important;width:100%;box-sizing:border-box;margin:8px 0 0;padding:6px 4px 0;border-top:1px solid rgba(255,255,255,.12)}
+html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem>h4{margin:0 0 4px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;opacity:.75}
+html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem #statusChips{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:3px!important;align-items:stretch!important;position:static!important;width:100%!important;max-width:100%!important}
+html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem #statusChips>*{display:block;max-width:100%!important;min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:10px!important;padding:2px 6px!important;line-height:1.35!important;box-sizing:border-box}
+html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem #statusChips>.hide{display:none!important}

@@ -444,7 +444,7 @@
   }
 
   async function sendStream(text, partner = "nexus") {
-    const body = { message: text, session_id: activeSession };
+    const body = { message: text, session_id: activeSession, target: partner || "nexus" }; // uiroute1116: Ziel immer mitsenden
     if (nxRewrite) { body[nxRewrite] = true; nxRewrite = null; } // 2026-10-28 CHAT04
     const model = $("#modelSelect") && $("#modelSelect").value;
     if (model) body.model = model;
@@ -576,7 +576,7 @@
         result = await sendStream(text, partner);
       } else {
         const route = partner === "hermes" ? "/api/hermes/agent" : (partner === "aether" ? "/api/aether/agent" : (partner === "gpt" && !window.NEXUS_GPT_CLOUD ? "/api/gpt/agent" : "/api/chat"));
-        const payload = { message: text, session_id: activeSession, chat_session_id: activeSession };
+        const payload = { message: text, session_id: activeSession, chat_session_id: activeSession, target: partner }; // uiroute1116
         // The cloud route owns model selection. The local Ollama selector is not
         // forwarded as an unsupported promise about the OpenAI model in use.
         if (partner === "gpt" && window.NEXUS_GPT_CLOUD) payload.mode = "cloud";  // t329u: Standard lokal
@@ -662,6 +662,8 @@
     if (!text || busy) return;
     let responsePartner = forcedPartner || window.NEXUS_PHASE2_PARTNER || "nexus";
     if (!partnerNames[responsePartner]) responsePartner = "nexus";
+    /* uiroute1116: sichtbares Ziel-Dropdown hat Vorrang (Ziel NEXUS -> NEXUS) */
+    try { const tsel = document.getElementById("nxGlassTargetSelect"); if (!forcedPartner && tsel && partnerNames[tsel.value]) { responsePartner = tsel.value; window.NEXUS_PHASE2_PARTNER = tsel.value; localStorage.setItem("nexus_phase2_partner", tsel.value); } } catch (e) {}
     const group = !forcedPartner && window.NEXUS_CHAT_MODE === "group";
     currentSpeaker = responsePartner;
     unlockSpeech();

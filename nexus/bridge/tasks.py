@@ -48,7 +48,42 @@ class TaskManager:
         self._day = datetime.now().strftime("%Y%m%d")
         self._executors: dict[str, ExecutorFn] = {}
         self._cancel_flags: dict[str, bool] = {}
+        self._archive_old_terminal_tasks()
         self._recover_orphaned_running_tasks()
+
+    def _archive_old_terminal_tasks(self, max_age_days: int = 30) -> None:
+        """Move old, terminal task records out of the live scan directory.
+
+        The persist dir accumulates one JSON file per task forever, and
+        __init__ reads every file on every boot to recover orphaned
+        'running' tasks. With thousands of files this makes every restart
+        slower. Terminal (non-running) records older than max_age_days are
+        moved verbatim (never deleted) into an archive subfolder so future
+        boots stay fast; nothing already running or recent is touched.
+        """
+        import time
+        try:
+            paths = list(self.storage.persist_dir.glob('NX-*.json'))
+        except Exception:
+            return
+        if len(paths) < 500:
+            return  # not worth the extra I/O pass yet
+        cutoff = time.time() - max_age_days * 86400
+        archive_dir = self.storage.persist_dir.parent / "tasks_archive"
+        for fp in paths:
+            try:
+                if fp.stat().st_mtime >= cutoff:
+                    continue
+                rec = self.storage.get(fp.stem)
+                if not rec or rec.status == 'running':
+                    continue
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                target = archive_dir / fp.name
+                if target.exists():
+                    continue
+                os.replace(fp, target)
+            except Exception:
+                continue  # never let archival block boot
 
     def _recover_orphaned_running_tasks(self) -> None:
         """Terminalize persisted running tasks owned by a previous bridge instance.

@@ -124,8 +124,8 @@ def _gate(action: str, params: dict[str, Any], approval_id: str | None,
 
 
 def _done(action: str, backend: str, **fields: Any) -> dict[str, Any]:
-    _audit("done", action=action, backend=backend, **{k: fields[k] for k in fields
-                                                      if k in ("path", "x", "y", "button", "keys", "chars")})
+    _audit("done", step=action, backend=backend, **{k: fields[k] for k in fields
+                                                    if k in ("path", "x", "y", "button", "keys", "chars")})
     return {"success": True, "action": action, "backend": backend, **fields}
 
 

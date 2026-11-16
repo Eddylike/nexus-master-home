@@ -113,6 +113,8 @@ COMPACT_CORE_PROMPT = (
     "6. Laufwerk C: ist tabu fuer neue Dateien; Arbeitsdaten liegen auf G:."
 )
 _FULL_PROMPT_RE = re.compile(r"\b(bau|baue|bauauftrag|implementier|programmier|code|skript|script|datei|ordner|projekt|crew|agent|autobuild|plan|repar|fix|install|deploy|server|backup|selbst|nexus.?all|hermes)\w*", re.I)
+# 2026-11-12: Uhrzeit nur in den Prompt, wenn danach gefragt wird (KV-Cache-Stabilitaet, s. build_context)
+_TIME_QUERY_RE = re.compile(r"\b(uhr|uhrzeit|zeit|spät|spaet|wie viel uhr|datum|heute|morgen|gestern|wochentag|kalender|termin|wann)\w*", re.I)
 
 
 class MasterController:
@@ -820,7 +822,13 @@ class MasterController:
             _vol.append(proj[:500] if not _full else proj)
         if extra:
             _vol.append(extra)
-        _vol.append("Lokale Uhrzeit: " + _dt.now().strftime("%d.%m.%Y %H:%M"))
+        # 2026-11-12 KV-Cache: qwen3.5 ist hybrid (llama.cpp nutzt Cache nur, wenn der neue Prompt
+        # den alten exakt verlaengert). Minutengenaue Uhrzeit im Prefix erzwang bei jeder Anfrage
+        # eine volle Neuberechnung (gemessen 15-35 s fuer "OK"). Datum immer, Uhrzeit nur auf Frage.
+        if _TIME_QUERY_RE.search(_q or ""):
+            _vol.append("Lokale Uhrzeit: " + _dt.now().strftime("%d.%m.%Y %H:%M"))
+        else:
+            _vol.append("Datum: " + _dt.now().strftime("%d.%m.%Y"))
         parts += _vol
         msgs = [{"role": "system", "content": "\n\n".join(parts)}]
         for m in session_messages[-16:]:

@@ -219,7 +219,7 @@ def test_system_status() -> None:
         check("rule.pc_fallback_ok_true", d1.get("ok") is True and d1.get("health") == nexus_os.DEGRADED, json.dumps({k: d1.get(k) for k in ("ok", "health")}))
     # Rule: Tailscale peer flag online but no pong -> not ONLINE (TAILSCALE_ONLY)
     fake_ts = {"available": True, "running": True, "data": {"Peer": {"x": {"HostName": "fake", "DNSName": "fake.ts.net.",
-               "TailscaleIPs": [nexus_os.load_config().get("phone_tailscale_ip") or "192.0.2.11"], "Online": True, "Active": False, "OS": "android"}}}}
+               "TailscaleIPs": [nexus_os.load_config().get("phone_tailscale_ip") or "100.64.0.1"], "Online": True, "Active": False, "OS": "android"}}}}
     no_pong = lambda target, cfg=None, force=False: {"ok": False, "error": "NO_PONG", "source": "test tailscale ping", "checked_at": nexus_os._iso(), "method": "tailscale_ping"}
     pong = lambda target, cfg=None, force=False: {"ok": True, "latency_ms": 12.0, "via": "test", "source": "test tailscale ping", "checked_at": nexus_os._iso(), "method": "tailscale_ping"}
     d4 = _cycle_with(nexus_os, adb_devices=no_dev, _tailscale_status=lambda: fake_ts, tailscale_ping=no_pong)
@@ -230,7 +230,7 @@ def test_system_status() -> None:
     check("rule.tailscale_ping_online", p5["status"] == nexus_os.ONLINE and p5.get("method") == "tailscale_ping" and d5["components"]["TERMUX"]["status"] == nexus_os.UNKNOWN,
           json.dumps({k: p5.get(k) for k in ("status", "reason", "method")}))
     # Rule: cached pong must be dropped as soon as the peer flag goes offline (live result + checked_at shown)
-    ip_cfg = nexus_os.load_config().get("phone_tailscale_ip") or "192.0.2.11"
+    ip_cfg = nexus_os.load_config().get("phone_tailscale_ip") or "100.64.0.1"
     fake_off = {"available": True, "running": True, "data": {"Peer": {"x": {"HostName": "fake", "DNSName": "fake.ts.net.",
                 "TailscaleIPs": [ip_cfg], "Online": False, "Active": False, "OS": "android"}}}}
     saved_ping, saved_prev = nexus_os._STATE.get("ts_ping"), nexus_os._STATE.get("peer_online_prev")
@@ -247,12 +247,12 @@ def test_system_status() -> None:
               and "pong 71" not in str(p6.get("detail")) and "kein pong" in str(p6.get("detail")) and bool(p6.get("checked_at")),
               json.dumps({"force": seen.get("force"), "status": p6.get("status"), "detail": p6.get("detail"), "checked_at": p6.get("checked_at")})[:220])
         # real function: force=True bypasses a cached pong
-        nexus_os._STATE["ts_ping"] = {"ok": True, "latency_ms": 71.0, "via": "stale", "target": "192.0.2.16", "ts": time.time(), "checked_at": nexus_os._iso()}
+        nexus_os._STATE["ts_ping"] = {"ok": True, "latency_ms": 71.0, "via": "stale", "target": "100.64.9.9", "ts": time.time(), "checked_at": nexus_os._iso()}
         old_exe = nexus_os._TAILSCALE_EXE
         nexus_os._TAILSCALE_EXE = r"C:\nexus-os-test\missing-tailscale.exe"
         try:
-            r_cached = nexus_os.tailscale_ping("192.0.2.16")
-            r_live = nexus_os.tailscale_ping("192.0.2.16", force=True)
+            r_cached = nexus_os.tailscale_ping("100.64.9.9")
+            r_live = nexus_os.tailscale_ping("100.64.9.9", force=True)
         finally:
             nexus_os._TAILSCALE_EXE = old_exe
         check("rule.ping_force_bypasses_cache", r_cached.get("cached") is True and r_live.get("cached") is False and r_live.get("ok") is not True,

@@ -25,3 +25,5 @@ conversations.json
 .pytest_cache/
 *.backup*
 *.BACKUP*
+*.new
+*_backup

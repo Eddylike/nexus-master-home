@@ -1,0 +1,395 @@
+/* glass_theme.css — Design-Tokens und Bausteine für NEXUS Master Home
+   Eine einzige Datei für alle Glas- und Tokens. Zentrale Stelle definieren! */
+
+:root {
+  /* --- Hintergrund --- */
+  --bg-primary: #070913;
+  --bg-secondary: #0B0E1B;
+  --bg-tertiary: rgba(18, 22, 41, 0.65);
+  --bg-glow: rgba(56, 189, 248, 0.15);
+  --bg-glow-strong: rgba(56, 189, 248, 0.3);
+
+  /* --- Akzente --- */
+  --accent: #38BDF8;       /* Babyblau */
+  --accent-cyan: #00E5FF;  /* Cyan */
+  --accent-hover: #6eeAF7;
+
+  /* --- Glas-Kachel --- */
+  --glass-bg: var(--bg-tertiary);
+  --glass-border: rgba(120, 200, 255, 0.25);
+  --glass-radius: 18px;
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+
+  /* --- Textfarben --- */
+  --text-on-dark: #FFFFFF;
+  --text-on-accent: #0A0A0A;
+  --text-on-glass: var(--text-on-dark);
+  --text-secondary: #9FB8D4;
+  --text-muted: #6B7E9A;
+
+  /* --- Ränder & Effekte --- */
+  --border-radius: 16px;
+  --border-glass: var(--glass-border);
+  --blur-level: 12px;
+  --blur-level-mobile: 8px;
+
+  /* --- Status-Punkte --- */
+  --status-online: var(--accent-cyan);
+  --status-offline: #6B7E9A;
+  --status-warning: #F5A623;
+  --status-error: #D0021B;
+
+  /* --- Schrift --- */
+  --font-stack: system-ui, "Segoe UI", sans-serif;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 16px;
+  --font-size-xl: 20px;
+}
+
+/* --- backdrop-filter nutzen, wo nötig */
+@media (hover:hover) {
+  .glassmorphism {
+    backdrop-filter: blur(var(--blur-level));
+    -webkit-backdrop-filter: blur(var(--blur-level));
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--glass-radius);
+    box-shadow: var(--glass-shadow);
+  }
+}
+
+/* --- reduzierte Motion fallback --- */
+@media (prefers-reduced-motion: reduce) {
+  .glassmorphism {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--bg-primary) !important;
+  }
+  .transition-none {
+    transition: none !important;
+  }
+  .animation-none {
+    animation: none !important;
+  }
+}
+
+/* --- Button-Stile --- */
+.btn-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-on-dark);
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-glass:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-glass:active {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-accent:hover {
+  background: var(--accent-hover);
+  color: var(--text-on-accent);
+}
+
+.btn-accent:active {
+  background: #0A0A0A;
+}
+
+/* --- Badge-Stile --- */
+.badge-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-on-dark);
+  padding: 2px 8px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.badge-accent {
+  background: var(--accent);
+  color: var(--text-on-accent);
+  padding: 2px 8px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+/* --- Chip-Stile --- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.chip-online {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--accent);
+}
+
+.chip-inactive {
+  background: rgba(90, 100, 120, 0.3);
+  color: var(--text-muted);
+}
+
+/* --- Eingabeleiste --- */
+.input-bar {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input-bar textarea {
+  background: transparent;
+  border: none;
+  color: var(--text-on-dark);
+  font-family: var(--font-stack);
+  flex: 1;
+  font-size: var(--font-size-md);
+  outline: none;
+}
+
+.input-bar textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* --- Kachel mit Icon/Titel/Untertitel --- */
+.kachel-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.kachel-glass:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.kachel-glass:active {
+  transform: translateY(0);
+}
+
+.kachel-icon {
+  width: 32px;
+  height: 32px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.kachel-titel {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--text-on-dark);
+}
+
+.kachel-untertitel {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* --- Fokus-Timer-Ring --- */
+.timer-ring {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.timer-ring svg {
+  transform: rotate(-90deg);
+}
+
+.timer-ring .progress {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+/* --- Navigation / Sidebar --- */
+.nav-glass button {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-on-dark);
+  padding: 10px 14px;
+  border-radius: var(--border-radius);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  margin: 2px 0;
+  transition: all 0.2s ease;
+}
+
+.nav-glass button:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.nav-glass button.active {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --- Header/Statusleiste --- */
+.header-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--glass-radius) 0 0 0;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 -16px 16px;
+}
+
+.header-glass .title {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  color: var(--text-on-dark);
+}
+
+.header-glass .status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* --- 12 Kacheln Raster --- */
+.kacheln-raster {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 1200px) {
+  .kacheln-raster { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .kacheln-raster { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 899px) {
+  .kacheln-raster { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- Mobile Spezifika --- */
+@media (max-width: 600px) {
+  .nx-side {
+    width: 100%;
+    position: fixed;
+    bottom: 0;
+    top: auto;
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+
+  .nx-side.open {
+    transform: translateY(0);
+  }
+
+  .kacheln-raster {
+    grid-template-columns: 1fr !important;
+  }
+
+  .input-bar {
+    flex-direction: column;
+    padding: 10px;
+  }
+
+  .input-bar textarea {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+
+
+/* Reduzierte Motion - Schalter in den Einstellungen */
+@media (prefers-reduced-motion: reduce) {
+  .glassmorphism {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--bg-primary) !important;
+  }
+  .transition-none {
+    transition: none !important;
+  }
+  .animation-none {
+    animation: none !important;
+  }
+}
+
+/* Schalter-Stil: Effekte reduzieren */
+.btn-reduce-effects {
+  background: var(--glass-bg);
+  border: 1px var(--glass-border);
+  color: var(--text-on-dark);
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  font-family: var(--font-stack);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  margin: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-reduce-effects:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-reduce-effects.active {
+  background: rgba(56, 189, 248, 0.3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Kacheln werden bei deaktivierten Effekten deckend */
+.kachel-glass.no-blur {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--bg-secondary) !important;
+}
+}

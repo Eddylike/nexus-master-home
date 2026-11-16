@@ -362,6 +362,7 @@ TOOLS: dict[str, ToolDef] = {
     "sandbox_delete": ToolDef(t_sandbox_delete, "SAFE_WRITE", desc="sandbox_delete(path) frei in workspace/sandbox loeschen (relativer Pfad)"),
     "web_search": ToolDef(t_web_search, "READ_ONLY", network=True, desc="web_search(query) kostenlose Websuche (DuckDuckGo), liefert Titel/URL/Snippet"),
     "fetch_url": ToolDef(t_fetch_url, "READ_ONLY", network=True, desc="fetch_url(url) oeffentliche Webseite als Text lesen"),
+    "open_url": ToolDef(lambda url: __import__("nexus.integrations.partner_tools", fromlist=["x"]).run("aether", "open_url", {"url": url}), "READ_ONLY", network=True, desc="open_url(url) Webseite im Browser auf Eddies PC oeffnen (gleiche Rechte wie Team)"),
     "shell_run": ToolDef(t_shell_run, "SAFE_WRITE", desc="shell_run(command) PowerShell-Befehl ueber das NEXUS-Terminal-Gate, cwd=workspace/sandbox"),
     "project_write": ToolDef(t_project_write, "SAFE_WRITE", special_only=True, desc="project_write(path, content) nur im Spezialauftrag: Datei unter NEXUS-Root schreiben, mit Backup"),
 }
@@ -618,7 +619,7 @@ class AgentSpec:
 TEMPLATES: dict[str, dict] = {
     "researcher": dict(name="researcher", role="Lokale Recherche: Gedaechtnis und NEXUS-Dateien durchsuchen, Quellen nennen.",
                        system_prompt="Du bist researcher. Nutze nur deine Tools. Antworte auf Deutsch mit Quellen (Dateipfad oder Memory-ID) und Kurzfazit. Erfinde nichts; wenn nichts gefunden, sag das. Dateien findest du mit search_files (Standardordner docs); nenne einen Treffer-Pfad aus hits als Quelle. Memory-IDs (M-xxxx) sind keine Dateien - nicht mit read_file oeffnen.",
-                       tools=["search_memory", "search_files", "read_file", "list_files", "web_search", "fetch_url"], max_steps=6),
+                       tools=["search_memory", "search_files", "read_file", "list_files", "web_search", "fetch_url", "open_url"], max_steps=6),
     "terminal": dict(name="terminal", role="Befehle im NEXUS-Terminal ausfuehren (Gate entscheidet Rechte), Arbeitsordner Sandbox.",
                      system_prompt="Du bist terminal. Nutze shell_run fuer PowerShell-Befehle. Das Gate entscheidet; BLOCKED-Ergebnisse ehrlich melden, nicht umgehen. Kein C:. Gib die echte Ausgabe wieder.",
                      tools=["shell_run", "list_files", "read_file"], max_steps=5),

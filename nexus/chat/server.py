@@ -703,6 +703,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/streams":
                 return self._json(200, ENGINE.master.streams.list())
             # AETHER — eigenstaendiger lokaler Forschungspartner (Ollama, kein Cloud-Fallback)
+            if path == "/api/agents/rights":  # 2026-11-16 gleiche Rechte fuer alle Agenten
+                from nexus.integrations import partner_tools as _pt
+                return self._json(200, _pt.rights())
             if path == "/api/aether/health":
                 from nexus.integrations.aether_agent import health as _aether_health
                 _a = _aether_health()
@@ -1005,6 +1008,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, ENGINE.chat(msg, body.get("session_id"), body.get("project_id"), model=body.get("model"), source=body.get("source")))
 
             # AETHER — lokaler Agent, festes vorhandenes Ollama-Modell; keine Ersatzantwort.
+            if path == "/api/agents/web":  # 2026-11-16 gemeinsame Web-/Browser-Tools, identisch fuer alle Agenten
+                _ag = self._agent_guard()
+                if not _ag[0]:
+                    return self._json(403, {"success": False, "error": _ag[1]})
+                from nexus.integrations import partner_tools as _pt
+                _wa = body.get("args") if isinstance(body.get("args"), dict) else {k: body.get(k) for k in ("query", "url", "limit", "max_chars") if body.get(k) is not None}
+                _w = _pt.run(str(body.get("agent") or ""), str(body.get("tool") or ""), _wa)
+                return self._json(200 if _w.get("success") else (403 if _w.get("status") == "DENIED" or _w.get("error") in ("AGENT_UNKNOWN", "TOOL_NOT_SHARED") else 502), _w)
             if path == "/api/aether/supervisor":  # 2026-11-02 Supervisor-MVP
                 _ag = self._agent_guard()
                 if not _ag[0]:
