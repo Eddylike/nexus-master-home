@@ -28,6 +28,7 @@ from nexus.livetalk.sentences import split_stream
 
 ROOT = Path(__file__).resolve().parents[2]
 METRICS_LOG = ROOT / "workspace" / "logs" / "livetalk_metrics.jsonl"
+_TEST_METRICS_LOG = ROOT / "workspace" / "tmp" / "livetalk_metrics_test.jsonl"
 WINDOW = 512                 # Samples je VAD-Fenster (32 ms bei 16 kHz)
 WIN_MS = 32
 CONV_TTL = 3600
@@ -35,6 +36,105 @@ CONV_ID = re.compile(r"[A-Za-z0-9_-]{6,40}\Z")
 _CONVS: dict[str, dict] = {}
 _CONV_LOCK = threading.Lock()
 ACTIVE: dict[str, dict] = {}
+# LT-CHAT (17.11.2026): Chatverlauf dauerhaft (Text, JSONL pro conversation_id = pro gekoppeltem Geraet)
+HISTORY_DIR = ROOT / "workspace" / "livetalk_history"
+_TEST_HISTORY_DIR = ROOT / "workspace" / "tmp" / "livetalk_history_test"
+HISTORY_KEEP = 400
+_HIST_LOCK = threading.Lock()
+_DATE = re.compile(r"\d{1,2}\.\d{1,2}\.(\d{2}|\d{4})")
+_PHONE_NR = re.compile(r"(?<![\w])\+?\d[\d \t/().-]{5,}\d")
+
+
+def _history_dir() -> Path:
+    """Live-Verlauf unter workspace/livetalk_history. Tests (PYTEST) und Override nie auf C:."""
+    import os
+    override = (os.environ.get("NEXUS_LIVETALK_HISTORY_DIR") or "").strip()
+    if override:
+        p = Path(override)
+        try:
+            if p.resolve().drive.upper() != "C:":
+                return p
+        except Exception:
+            pass
+        return _TEST_HISTORY_DIR
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return _TEST_HISTORY_DIR
+    return HISTORY_DIR
+
+
+def _history_file(conv_id: str) -> Path | None:
+    if not conv_id or not CONV_ID.fullmatch(str(conv_id)):
+        return None
+    return _history_dir() / f"{conv_id}.jsonl"
+
+
+def scrub(text: str) -> str:
+    """Telefonnummern nie in die Verlaufsdatei."""
+    def _sub(m):
+        v = m.group(0)
+        if sum(c.isdigit() for c in v) < 7 or _DATE.fullmatch(v.strip()):
+            return v
+        return "[Nummer]"
+    return _PHONE_NR.sub(_sub, str(text or ""))
+
+
+def history_append(conv_id: str, role: str, content: str, **extra) -> None:
+    path = _history_file(conv_id)
+    content = scrub(content).strip()
+    if path is None or not content:
+        return
+    rec = {"ts": round(time.time(), 3), "role": role, "content": content[:8000]}
+    rec.update({k: v for k, v in extra.items() if v not in (None, False, "")})
+    try:
+        with _HIST_LOCK:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+def history_load(conv_id: str, limit: int = 200) -> list[dict]:
+    path = _history_file(conv_id)
+    if path is None or not path.exists():
+        return []
+    out: list[dict] = []
+    try:
+        with _HIST_LOCK:
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        if len(lines) > HISTORY_KEEP * 2:  # Datei klein halten
+            try:
+                with _HIST_LOCK:
+                    path.write_text("\n".join(lines[-HISTORY_KEEP:]) + "\n", encoding="utf-8")
+            except Exception:
+                pass
+        for ln in lines[-max(1, int(limit)):]:
+            try:
+                r = json.loads(ln)
+            except Exception:
+                continue
+            if isinstance(r, dict) and r.get("role") in ("user", "assistant") and r.get("content"):
+                out.append(r)
+    except Exception:
+        return []
+    return out
+
+
+def history_clear(conv_id: str) -> bool:
+    path = _history_file(conv_id)
+    with _CONV_LOCK:
+        rec = _CONVS.get(conv_id)
+        if rec is not None:
+            rec["history"].clear()
+    if path is None:
+        return False
+    try:
+        with _HIST_LOCK:
+            if path.exists():
+                path.unlink()
+        return True
+    except Exception:
+        return False
 
 
 def is_allowed_client(ip: str) -> bool:
@@ -48,7 +148,11 @@ def conversation(conv_id: str | None) -> tuple[str, list[dict]]:
     with _CONV_LOCK:
         for k in [k for k, v in _CONVS.items() if now - v["ts"] > CONV_TTL]:
             _CONVS.pop(k, None)
-        rec = _CONVS.setdefault(cid, {"history": [], "ts": now})
+        rec = _CONVS.get(cid)
+        if rec is None:  # nach Core-Neustart: Kontext (nur Text) aus der Verlaufsdatei
+            hist = [{k: v for k, v in r.items() if k in ("role", "content", "agent")}
+                    for r in history_load(cid, 40) if not r.get("announce")]
+            rec = _CONVS[cid] = {"history": hist, "ts": now}
         rec["ts"] = now
         return cid, rec["history"]
 
@@ -73,10 +177,28 @@ def first_clause_split(sentences, min_chars: int = 40):
         yield s
 
 
+def _metrics_log_path() -> Path:
+    """Live-Log nur im echten Dienst. Tests und NEXUS_LIVETALK_METRICS_LOG schreiben auf G: tmp."""
+    import os
+    override = (os.environ.get("NEXUS_LIVETALK_METRICS_LOG") or "").strip()
+    if override:
+        p = Path(override)
+        try:
+            if p.resolve().drive.upper() != "C:":
+                return p
+        except Exception:
+            pass
+        return _TEST_METRICS_LOG
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return _TEST_METRICS_LOG
+    return METRICS_LOG
+
+
 def _log_metrics(rec: dict) -> None:
     try:
-        METRICS_LOG.parent.mkdir(parents=True, exist_ok=True)
-        with METRICS_LOG.open("a", encoding="utf-8") as f:
+        path = _metrics_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
     except Exception:
         pass
@@ -110,7 +232,7 @@ class Session:
                 return agents.reply_stream(self.engine, agent, mode, text, history, call_id, meta)
 
             def _route_default(text):
-                return agents.route(text, from_phone=self.from_phone)
+                return agents.route(text, from_phone=self.from_phone, phone=getattr(self, "phone", None))
 
             reply = reply or _reply_default
             route = route or _route_default
@@ -162,6 +284,25 @@ class Session:
             return
         if key:
             self._announced_files.add(key)
+        self.announce(spoken)
+
+    def _announce_notification(self, data: dict) -> None:
+        """Neue Handy-Benachrichtigung vorlesen, sobald die Sitzung frei ist."""
+        from nexus.livetalk.notif_util import is_speakable
+        from nexus.livetalk.phone_link import speak_notifications
+        if not is_speakable(data) or data.get("ongoing"):
+            return
+        nid = str(data.get("id") or data.get("key") or "")
+        seen = getattr(self, "_announced_notifs", None)
+        if seen is None:
+            self._announced_notifs = seen = set()
+        if nid and nid in seen:
+            return
+        spoken = speak_notifications([data])
+        if not spoken or "keine Nachrichten" in spoken:
+            return
+        if nid:
+            seen.add(nid)
         self.announce(spoken)
 
     def announce(self, text: str) -> None:
@@ -224,6 +365,7 @@ class Session:
             self.send("ready", conversation_id=self.conv_id, turns=len(self.history) // 2,
                       voice=Path(self.cfg["piper_model"]).stem, stt=self.cfg["stt_model"],
                       end_silence_ms=self.cfg["end_silence_ms"], agents=["NEXUS", "Hermes", "NEXUS GPT", "Aether"])
+            self.send("history", conversation_id=self.conv_id, items=history_load(self.conv_id))
             if self._warm:
                 threading.Thread(target=self._warmup, name="livetalk-warm", daemon=True).start()
             else:
@@ -245,13 +387,21 @@ class Session:
         if t == "text":  # Texteingabe (ohne Mikrofon) - gleicher Ablauf ohne STT
             text = str(msg.get("text") or "").strip()[:600]
             if text:
-                self._start_turn(b"", text=text)
+                self._start_turn(b"", text=text, speak=msg.get("speak") is not False)
             return
+        if t == "history":  # LT-CHAT: Verlauf anfordern
+            return self.send("history", conversation_id=self.conv_id, items=history_load(self.conv_id))
+        if t == "history_clear":  # LT-CHAT: Verlauf loeschen (Rueckfrage macht die Oberflaeche)
+            ok = history_clear(self.conv_id)
+            self.history = conversation(self.conv_id)[1]
+            return self.send("history_clear", conversation_id=self.conv_id, ok=ok)
         if t == "phone_notification":
             data = msg.get("data") or msg.get("notification") or msg
             ev = msg.get("event") or "posted"
-            if ev != "removed":
-                self.phone.remember_notification(data if isinstance(data, dict) else {})
+            if ev != "removed" and isinstance(data, dict):
+                self.phone.remember_notification(data)
+                if ev == "posted":
+                    self._announce_notification(data)
             return
         if t == "phone_file":
             rec = msg.get("data") or msg.get("file") or msg
@@ -395,7 +545,8 @@ class Session:
     def _cancel_turn(self, reason: str) -> None:
         self._cancel.set()
 
-    def _start_turn(self, pcm: bytes, text: str | None = None, spec: dict | None = None, announce: bool = False) -> None:
+    def _start_turn(self, pcm: bytes, text: str | None = None, spec: dict | None = None, announce: bool = False,
+                    speak: bool = True) -> None:
         th = self._turn_thread
         if th is not None and th.is_alive():
             self._cancel.set()  # alter Zug beendet sich selbst (nicht im IO-Thread warten)
@@ -409,12 +560,12 @@ class Session:
             self.ctrl.set_state("thinking")
         tid, cancel, t_end = self.turn_id, self._cancel, self.clock()
         self.send("state", state="thinking", turn=tid)
-        self._turn_thread = threading.Thread(target=self._turn, args=(tid, pcm, text, cancel, t_end, spec, announce),
+        self._turn_thread = threading.Thread(target=self._turn, args=(tid, pcm, text, cancel, t_end, spec, announce, speak),
                                              name=f"livetalk-turn-{tid}", daemon=True)
         self._turn_thread.start()
 
     def _turn(self, tid: int, pcm: bytes, text: str | None, cancel: threading.Event, t_end: float,
-              spec: dict | None = None, announce: bool = False) -> None:
+              spec: dict | None = None, announce: bool = False, speak: bool = True) -> None:
         m = {"turn": tid, "conv": self.conv_id, "ts": time.time(), "endpoint_ms": int(self.cfg["end_silence_ms"]),
              "audio_in_s": round(len(pcm) / 32000, 2)}
         spoken: list[str] = []
@@ -491,7 +642,10 @@ class Session:
                     m["first_sentence_ms"] = int((self.clock() - t_end) * 1000)
                 first_chunk = True
                 t_s = self.clock()
-                for sr, audio in self._synth(sentence):
+                if not speak:  # LT-CHAT: getippt + "Antworten vorlesen" aus -> nur Text
+                    m["silent"] = True
+                    self.send("tts_chunk", turn=tid, index=idx, sr=0, samples=0, text=sentence, agent=m.get("agent"))
+                for sr, audio in (self._synth(sentence) if speak else ()):
                     if cancel.is_set():
                         break
                     if not self._audio_sent_any:
@@ -532,11 +686,15 @@ class Session:
             reply = " ".join(spoken).strip()
             if text and tid not in self._merged and not announce:  # zusammengefuehrte Zuege zaehlen nur einmal
                 self.history.append({"role": "user", "content": text})
+                history_append(self.conv_id, "user", text, typed=bool(m.get("text_input")), turn=tid)
                 if reply:
                     self.history.append({"role": "assistant", "content": reply, "agent": m.get("agent") or "NEXUS",
                                          "interrupted": bool(m.get("interrupted"))})
+                    history_append(self.conv_id, "assistant", reply, agent=m.get("agent") or "NEXUS",
+                                   interrupted=bool(m.get("interrupted")), turn=tid)
             elif announce and reply:
                 self.history.append({"role": "assistant", "content": reply, "agent": "NEXUS", "announce": True})
+                history_append(self.conv_id, "assistant", reply, agent="NEXUS", announce=True, turn=tid)
                 del self.history[:-40]
             m["reply_chars"] = len(reply)
             if reply:

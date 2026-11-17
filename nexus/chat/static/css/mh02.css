@@ -1,0 +1,100 @@
+/* mh02 (Nexus-UI, 17.11.2026): Master Home Glas-Startseite. Alles unter body.mh02 -> ?mh=alt schaltet es komplett ab. */
+html body#nxBody.mh02{--mh-navy:#07122a;--mh-glass:rgba(12,28,58,.62);--mh-glass-2:rgba(18,40,78,.55);--mh-line:rgba(110,220,255,.22);--mh-cyan:#3fe0ff;--mh-cyan-2:#7ff0ff;--mh-text:#e8f6ff;--mh-muted:#a9c3dc;--mh-ok:#4ade80;--mh-warn:#fbbf24;--mh-off:#94a3b8}
+/* Hintergrund: dunkles Navy statt Lila-Stich (Video bleibt) */
+html body#nxBody.mh02 #nxDesktopDim{background:radial-gradient(1200px 700px at 30% 0%,rgba(20,60,120,.35),transparent 60%),linear-gradient(180deg,rgba(4,10,26,.62),rgba(5,12,30,.78))!important}
+/* Sidebar-Gruppen */
+html body#nxBody.mh02 #nxGlassNav{flex:1 1 0!important;min-height:120px!important;overflow-y:auto!important;overflow-x:hidden!important;scrollbar-width:thin}
+html body#nxBody.mh02 #nxGlassNav .mh02-nav-group{flex:0 0 auto;margin:8px 6px 2px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--mh-cyan-2);opacity:.85;line-height:14px}
+html body#nxBody.mh02 #nxGlassNav .mh02-nav-group:first-child{margin-top:0}
+html body#nxBody.mh02 #nxGlassNav>.nx-glass-nav-button{min-height:27px!important;height:auto!important;padding-top:3px!important;padding-bottom:3px!important;margin-top:0!important;margin-bottom:1px!important;flex:0 0 auto!important}
+html body#nxBody.mh02 #nxGlassNav>.nx-glass-nav-button.nx-glass-nav-section{border-top:0!important;margin-top:0!important;padding-top:3px!important}
+html body#nxBody.mh02 #nxGlassNav .mh02-nav-extra .nx-glass-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+html body#nxBody.mh02 #nxGlassNav>.nx-glass-nav-button.active,html body#nxBody.mh02 #nxGlassNav>.nx-glass-nav-button:hover{background:linear-gradient(90deg,rgba(63,224,255,.18),rgba(63,224,255,.04))!important;color:var(--mh-text)!important;box-shadow:inset 2px 0 0 var(--mh-cyan)}
+/* Startseite: alte Begruessung ersetzt, Element bleibt fuer app.js bestehen */
+html body#nxBody.mh02 #welcome{display:none!important}
+html body#nxBody.mh02 #mh02Home[hidden]{display:none!important}
+html body#nxBody.mh02 #mh02Home{display:flex;flex-direction:column;gap:12px;box-sizing:border-box;width:100%;max-width:1180px;margin:6px auto 16px;padding:0 14px;color:var(--mh-text);font-size:13px;line-height:1.4;min-width:0}
+html body#nxBody.mh02 #mh02Home *{box-sizing:border-box;min-width:0}
+html body#nxBody.mh02 #mh02Home .mh02-row{display:grid;gap:12px}
+html body#nxBody.mh02 #mh02Home .mh02-row-top{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,1.1fr)}
+html body#nxBody.mh02 #mh02Home .mh02-row-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+html body#nxBody.mh02 #mh02Home .mh02-card{background:linear-gradient(160deg,var(--mh-glass-2),var(--mh-glass));border:1px solid var(--mh-line);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,8,24,.45),inset 0 1px 0 rgba(255,255,255,.06);-webkit-backdrop-filter:blur(14px) saturate(1.2);backdrop-filter:blur(14px) saturate(1.2);color:var(--mh-text);overflow:hidden}
+html body#nxBody.mh02 #mh02Home .mh02-card-head{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+html body#nxBody.mh02 #mh02Home .mh02-card-head h3{margin:0;font-size:13px;font-weight:700;letter-spacing:.04em;color:var(--mh-text);flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody.mh02 #mh02Home h4{margin:8px 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mh-muted)}
+html body#nxBody.mh02 #mh02Home .mh02-ico{width:18px;height:18px;flex:0 0 18px;fill:none;stroke:var(--mh-cyan);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+html body#nxBody.mh02 #mh02Home .mh02-chip{flex:0 0 auto;font-size:10.5px;padding:2px 8px;border-radius:999px;border:1px solid var(--mh-line);color:var(--mh-cyan-2);background:rgba(63,224,255,.08);white-space:nowrap;max-width:60%;overflow:hidden;text-overflow:ellipsis}
+/* Hero */
+html body#nxBody.mh02 #mh02Home .mh02-hero{display:flex;flex-direction:column;justify-content:center;background:radial-gradient(420px 200px at 0% 0%,rgba(63,224,255,.22),transparent 70%),linear-gradient(160deg,rgba(16,40,84,.7),rgba(8,22,48,.7))}
+html body#nxBody.mh02 #mh02Home .mh02-kicker{margin:0;font-size:10.5px;letter-spacing:.16em;color:var(--mh-cyan-2);font-weight:700}
+html body#nxBody.mh02 #mh02Home #mh02Greet{margin:4px 0 2px;font-size:clamp(22px,2.1vw,32px);line-height:1.15;font-weight:800;color:#f4fbff;text-shadow:0 0 24px rgba(63,224,255,.25)}
+html body#nxBody.mh02 #mh02Home .mh02-date{margin:0 0 10px;color:var(--mh-muted);font-size:12.5px}
+html body#nxBody.mh02 #mh02Home .mh02-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+html body#nxBody.mh02 #mh02Home .mh02-stat{padding:7px 9px;border-radius:12px;background:rgba(4,14,34,.55);border:1px solid rgba(110,220,255,.14)}
+html body#nxBody.mh02 #mh02Home .mh02-stat-label{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--mh-muted)}
+html body#nxBody.mh02 #mh02Home .mh02-stat-value{display:block;font-size:13.5px;color:var(--mh-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody.mh02 #mh02Home #mh02Stat-health[data-state=ok] .mh02-stat-value{color:var(--mh-ok)}
+html body#nxBody.mh02 #mh02Home #mh02Back{align-self:flex-start;margin-top:8px}
+html body#nxBody.mh02 #mh02Home #mh02Back[hidden]{display:none!important}
+/* Focus-Timer */
+html body#nxBody.mh02 #mh02Home .mh02-focus-time{font-size:clamp(30px,3vw,44px);font-weight:800;letter-spacing:.04em;font-variant-numeric:tabular-nums;color:#f4fbff;text-align:center;line-height:1.1;margin:2px 0 6px}
+html body#nxBody.mh02 #mh02Home .mh02-focus-bar{height:5px;border-radius:5px;background:rgba(255,255,255,.08);overflow:hidden;margin-bottom:8px}
+html body#nxBody.mh02 #mh02Home .mh02-focus-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--mh-cyan),#60a5fa);transition:width .9s linear}
+html body#nxBody.mh02 #mh02Home .mh02-focus-presets,html body#nxBody.mh02 #mh02Home .mh02-focus-ctl{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:6px}
+html body#nxBody.mh02 #mh02Home .mh02-pill,html body#nxBody.mh02 #mh02Home .mh02-primary,html body#nxBody.mh02 #mh02Home .mh02-link{font:inherit;font-size:12px;cursor:pointer;border-radius:999px;padding:4px 11px;border:1px solid var(--mh-line);background:rgba(8,22,48,.6);color:var(--mh-text);line-height:1.3;white-space:nowrap}
+html body#nxBody.mh02 #mh02Home .mh02-pill.active{border-color:var(--mh-cyan);color:#04121f!important;background:var(--mh-cyan)!important}
+html body#nxBody.mh02 #mh02Home .mh02-primary{background:linear-gradient(90deg,#22d3ee,#3b82f6)!important;color:#03121f!important;font-weight:700;border-color:transparent}
+html body#nxBody.mh02 #mh02Home .mh02-link{display:inline-block;margin-top:8px;background:transparent;color:var(--mh-cyan-2);border-color:rgba(110,220,255,.3)}
+html body#nxBody.mh02 #mh02Home :is(.mh02-pill,.mh02-primary,.mh02-link,.mh02-tile,.mh02-quick-btn):hover{border-color:var(--mh-cyan);box-shadow:0 0 0 1px rgba(63,224,255,.35),0 6px 18px rgba(0,180,255,.15)}
+html body#nxBody.mh02 #mh02Home :is(button):focus-visible{outline:2px solid var(--mh-cyan);outline-offset:2px}
+/* Kalender */
+html body#nxBody.mh02 #mh02Home .mh02-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px;text-align:center;font-size:11px}
+html body#nxBody.mh02 #mh02Home .mh02-wd{color:var(--mh-muted);font-size:10px;font-weight:700}
+html body#nxBody.mh02 #mh02Home .mh02-day{padding:2px 0;border-radius:6px;color:var(--mh-text);font-variant-numeric:tabular-nums}
+html body#nxBody.mh02 #mh02Home .mh02-today{background:var(--mh-cyan)!important;color:#03121f!important;font-weight:800}
+html body#nxBody.mh02 #mh02Home .mh02-has{box-shadow:inset 0 -2px 0 var(--mh-warn)}
+/* Listen */
+html body#nxBody.mh02 #mh02Home .mh02-list{display:flex;flex-direction:column;gap:4px}
+html body#nxBody.mh02 #mh02Home .mh02-item{display:flex;flex-direction:column;padding:5px 8px 5px 10px;border-radius:9px;background:rgba(4,14,34,.5);border-left:2px solid rgba(110,220,255,.35)}
+html body#nxBody.mh02 #mh02Home .mh02-item.mh02-ok{border-left-color:var(--mh-ok)}
+html body#nxBody.mh02 #mh02Home .mh02-item.mh02-warn{border-left-color:var(--mh-warn)}
+html body#nxBody.mh02 #mh02Home .mh02-item.mh02-off{border-left-color:var(--mh-off);opacity:.85}
+html body#nxBody.mh02 #mh02Home .mh02-item-main{color:var(--mh-text);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody.mh02 #mh02Home .mh02-item-sub{color:var(--mh-muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody.mh02 #mh02Home .mh02-empty{margin:2px 0;padding:8px 10px;border-radius:9px;border:1px dashed rgba(110,220,255,.25);color:var(--mh-muted);font-size:12px;text-align:center}
+html body#nxBody.mh02 #mh02Home .mh02-err{color:#fcd34d}
+/* Schnellzugriff + Kacheln */
+html body#nxBody.mh02 #mh02Home .mh02-quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+html body#nxBody.mh02 #mh02Home .mh02-tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+html body#nxBody.mh02 #mh02Home :is(.mh02-quick-btn,.mh02-tile){font:inherit;cursor:pointer;display:flex;align-items:center;gap:9px;text-align:left;padding:8px 10px;border-radius:12px;border:1px solid rgba(110,220,255,.18);background:linear-gradient(160deg,rgba(20,46,90,.55),rgba(8,22,48,.55));color:var(--mh-text);min-height:44px}
+html body#nxBody.mh02 #mh02Home .mh02-tile{flex-direction:column;align-items:flex-start;justify-content:space-between;min-height:84px;padding:10px 12px}
+html body#nxBody.mh02 #mh02Home .mh02-tile .mh02-ico{width:24px;height:24px;flex-basis:auto;padding:5px;box-sizing:content-box;border-radius:10px;background:rgba(63,224,255,.12)}
+html body#nxBody.mh02 #mh02Home .mh02-btn-text{display:flex;flex-direction:column;min-width:0;max-width:100%}
+html body#nxBody.mh02 #mh02Home .mh02-btn-text strong{font-size:13px;color:var(--mh-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody.mh02 #mh02Home .mh02-btn-text small{font-size:11px;color:var(--mh-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* KI-Team */
+html body#nxBody.mh02 #mh02Home .mh02-team{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+html body#nxBody.mh02 #mh02Home .mh02-agent{--mh02-agent:var(--mh-cyan);position:relative;padding:10px 12px;border-radius:14px;background:linear-gradient(160deg,rgba(20,46,90,.6),rgba(6,18,40,.6));border:1px solid rgba(110,220,255,.16);border-top:2px solid var(--mh02-agent);display:flex;flex-direction:column;gap:2px}
+html body#nxBody.mh02 #mh02Home .mh02-agent.mh02-selected{box-shadow:0 0 0 1px var(--mh02-agent),0 8px 22px rgba(0,0,0,.35)}
+html body#nxBody.mh02 #mh02Home .mh02-agent-head{display:flex;align-items:center;gap:7px;font-size:14px;letter-spacing:.04em;color:var(--mh-text)}
+html body#nxBody.mh02 #mh02Home .mh02-dot{width:9px;height:9px;border-radius:50%;background:var(--mh-off);flex:0 0 9px}
+html body#nxBody.mh02 #mh02Home .mh02-agent[data-state=ok] .mh02-dot{background:var(--mh-ok);box-shadow:0 0 8px var(--mh-ok)}
+html body#nxBody.mh02 #mh02Home .mh02-agent[data-state=err] .mh02-dot{background:#f87171;box-shadow:0 0 8px #f87171}
+html body#nxBody.mh02 #mh02Home .mh02-agent-role{margin:0 0 4px;font-size:11px;color:var(--mh02-agent);filter:brightness(1.25)}
+html body#nxBody.mh02 #mh02Home .mh02-agent-line{margin:0;font-size:11.5px;color:var(--mh-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+html body#nxBody.mh02 #mh02Home .mh02-agent-btn{margin-top:7px;align-self:flex-start}
+html body#nxBody.mh02 #mh02Home .mh02-foot{margin:0;text-align:center;font-size:11px;color:var(--mh-muted)}
+/* schmale Mittelspalte (Zweitmonitor 1280, Live-Hub rechts): richtet sich nach der Breite der Startseite selbst */
+html body#nxBody.mh02 #mh02Home{container-type:inline-size;container-name:mh02home}
+@container mh02home (max-width:1060px){
+#mh02Home .mh02-tiles{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+#mh02Home .mh02-row-top{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+#mh02Home .mh02-row-top .mh02-hero{grid-column:1/-1}
+#mh02Home .mh02-team{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+#mh02Home .mh02-row-3{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@container mh02home (max-width:640px){
+#mh02Home .mh02-tiles{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+#mh02Home .mh02-row-top,#mh02Home .mh02-row-3,#mh02Home .mh02-team{grid-template-columns:minmax(0,1fr)!important}
+}
+@media (prefers-reduced-motion:reduce){html body#nxBody.mh02 #mh02Home .mh02-focus-bar i{transition:none}}

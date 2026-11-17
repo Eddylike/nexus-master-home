@@ -42,14 +42,14 @@ html body ::-webkit-scrollbar{width:8px}html body ::-webkit-scrollbar-thumb{back
 <script>
 try{if(window.top!==window||/[?&]embed=1/.test(location.search))document.documentElement.classList.add("emb")}catch(_){document.documentElement.classList.add("emb")}
 document.addEventListener("click",ev=>{const d=ev.target.closest&&ev.target.closest(".d");if(d){d.classList.toggle("open");d.title=d.classList.contains("open")?"einklappen":"Roh-JSON aufklappen"}});
-const AG=["NEXUS","Hermes","Bridge","Crew","Fixer","Hermes-PS","NEXUS-GPT","Monitor"],on={};const flt=document.getElementById("flt");
+const AG=["NEXUS","Hermes","NEXUS-GPT","AETHER","Bridge","Crew","Fixer","Hermes-PS","Monitor"],on={};const ALIAS={"Aether":"AETHER","aether":"AETHER","NEXUS GPT":"NEXUS-GPT","GPT":"NEXUS-GPT"};const norm=a=>ALIAS[a]||a;const flt=document.getElementById("flt");
 AG.forEach(a=>{on[a]=true;const l=document.createElement("label");l.innerHTML=`<input type=checkbox checked> <span class="a ${a}">${a}</span> `;l.firstChild.onchange=e=>{on[a]=e.target.checked;apply()};flt.appendChild(l)});
 const log=document.getElementById("log"),q=document.getElementById("q"),as=document.getElementById("as"),st=document.getElementById("st");
 q.oninput=apply;document.getElementById("cl").onclick=()=>log.innerHTML="";
 function esc(s){return String(s??"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))}
 function vis(d){const ag=AG.includes(d.dataset.a)?d.dataset.a:"Monitor";return on[ag]&&(!q.value||d.textContent.toLowerCase().includes(q.value.toLowerCase()))}
 function apply(){for(const d of log.children)d.style.display=vis(d)?"":"none"}
-function add(e){const d=document.createElement("div");d.className="e";d.dataset.a=e.agent;
+function add(e){e.agent=norm(e.agent);if(e.target)e.target=norm(e.target);const d=document.createElement("div");d.className="e";d.dataset.a=e.agent;
 const ok=e.ok===true?' <span class=ok>✔</span>':e.ok===false?' <span class=err>✘</span>':'';
 d.innerHTML=`<span class=t>${esc((e.ts||"").slice(11,23))}</span> <span class="a ${esc(e.agent)}">${esc(e.agent)}</span>${e.target?" → <span class='a "+esc(e.target)+"'>"+esc(e.target)+"</span>":""} <span class=k>[${esc(e.kind)}]</span> ${esc(e.text)}${ok}${e.data?`<span class=d>${esc(e.data)}</span>`:""}`;
 d.style.display=vis(d)?"":"none";log.appendChild(d);while(log.children.length>3000)log.firstChild.remove();if(as.checked)window.scrollTo(0,document.body.scrollHeight)}

@@ -6,7 +6,9 @@ MSG_TYPES = ("start", "stop", "audio", "transcript", "token", "tts_chunk", "barg
              # LT-08 (10.11.2026): Sitzung, Agent, Wiedergabe, Messwerte, Texteingabe, Keepalive
              "hello", "ready", "loaded", "agent", "tts_end", "playback", "metrics", "text", "vad", "ping", "pong",
              # App 1.1.0: Handy-Bruecke (Benachrichtigungen, Dateien, Kommandos)
-             "phone_notification", "phone_file", "phone_cmd", "phone_result")
+             "phone_notification", "phone_file", "phone_cmd", "phone_result",
+             # LT-CHAT (17.11.2026): Chatverlauf laden/loeschen
+             "history", "history_clear")
 
 
 def encode(msg_type: str, **payload) -> str:

@@ -15,7 +15,7 @@
 <link rel="stylesheet" href="/static/css/master_reference.css?v=20261106-layout1"/>
 <link rel="stylesheet" href="/static/css/no_avatar.css?v=uiwork61"/>
 <link rel="stylesheet" href="/static/css/nexus4d.css?v=uiwork61"/><link rel="stylesheet" href="/static/css/nexus4d_dark.css?v=uiwork61"/><link rel="stylesheet" href="/static/css/nexus4d_mh4d.css?v=uiwork61"/><link rel="stylesheet" href="/static/css/think_panel.css?v=uiwork61"/><link rel="stylesheet" href="/static/css/nexus4d_glass.css?v=uiwork61"/>
-<link rel="stylesheet" href="/static/css/uifix1116.css?v=uifix1116b"/></head>
+<link rel="stylesheet" href="/static/css/uifix1116.css?v=uifix1116c"/></head>
     <body id="nxBody" class="nx-app nx-4d">
 <!-- 20261102 NEXUS 4D: Hell/Dunkel-Schalter entfernt, dunkel ist Standard (Backup: G:\meine-ki\backups\ui_4d_redesign_20261102) -->
 <div id="nxDesktopBgWrap" class="nx-desktop-bg-wrap" aria-hidden="true">
@@ -721,7 +721,7 @@ function start(){go()}if(document.readyState==="complete")setTimeout(start,0);el
 <script src="/static/js/master_glass.js?v=20261106-layout1"></script>
 <script src="/static/js/nexus4d.js?v=uiwork61"></script>
 <script src="/static/js/think_panel.js?v=uiwork61"></script>
-<script src="/static/js/glass_theme.js?v=uiwork61"></script><script src="/static/js/uifix1116.js?v=uifix1116a"></script>
+<script src="/static/js/glass_theme.js?v=uiwork61"></script><script src="/static/js/uifix1116.js?v=uifix1116d"></script>
 <script src="/static/js/mh4d_fixes.js?v=uiwork61"></script>
 <script id="nxGlassRetry">/* 20261102 Nexus-UI: falls master_glass.js nicht geladen hat (Netzwackler), einmal nachladen */(function(){function chk(){if(window.__nxGlassRetried||document.getElementById("nxReferenceScene")||window.NEXUS_GLASS)return;window.__nxGlassRetried=1;var s=document.createElement("script");s.src="/static/js/master_glass.js?v=20261106-layout1&retry="+Date.now();document.body.appendChild(s);if(document.body)document.body.dataset.glassRetry="1"}setTimeout(chk,2500);window.addEventListener("load",function(){setTimeout(chk,300)})})();</script>
 <style id="nxLiveHubCss">
@@ -911,5 +911,8 @@ var tiles=["whatsapp","facebook","youtube","files","mail","studio","nexusall"].f
 var pre=document.createElement("pre");pre.id="nxGridResult";pre.textContent="GRIDCHECK "+JSON.stringify({R:["nxReferenceScene","nxReferenceCard-whatsapp","nxReferenceCard-studio","nxReferenceCard-files","nxLiveHub","nxReferenceCard-nexusall"].map(function(i){var e=document.getElementById(i);if(!e)return i+":-";var r=e.getBoundingClientRect();return i+":"+[r.left,r.top,r.width,r.height].map(Math.round).join(",")+":"+getComputedStyle(e).zoom}),w:innerWidth,h:innerHeight,tiles:tiles,checked:P.length,overlap:ov,dupLabels:d,livehubInScene:!!(document.getElementById("nxReferenceScene")||{contains:function(){return false}}).contains(document.getElementById("nxLiveHub"))});document.body.appendChild(pre);window.__nxRelease&&window.__nxRelease()},1200);
 })();
 </script>
+<!-- mh02 (Nexus-UI, 17.11.2026): Master Home Glas-Startseite, Rueckweg ?mh=alt -->
+<link rel="stylesheet" href="/static/css/mh02.css?v=mh02b"/>
+<script src="/static/js/mh02.js?v=mh02b"></script>
 </body>
 </html>

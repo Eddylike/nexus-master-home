@@ -16,6 +16,19 @@ def _skip_visual_tests_without_display(request):
 
 
 @pytest.fixture(autouse=True)
+def _livetalk_metrics_tmp(monkeypatch):
+    """Live-Talk-Session-Tests duerfen nicht in workspace/logs/livetalk_metrics.jsonl schreiben."""
+    path = r"G:\meine-ki\nexus-ai\workspace\tmp\livetalk_metrics_test.jsonl"
+    monkeypatch.setenv("NEXUS_LIVETALK_METRICS_LOG", path)
+    try:
+        import nexus.livetalk.server as lt_server
+        monkeypatch.setattr(lt_server, "METRICS_LOG", __import__("pathlib").Path(path))
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _nexus_terminal_tmp(tmp_path_factory, monkeypatch):
     try:
         from nexus.terminal import service

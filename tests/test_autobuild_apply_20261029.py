@@ -53,7 +53,7 @@ def _ab(plans, runner, seen):
     def planner(item):
         seen.append(dict(item))
         return {"mode": "patch", "result": {"edits": next(it)}}
-    return loop.Autobuild(tests_runner=runner, planner=planner, hermes=lambda c, t: {"ok": True, "path": "p"}, busy=lambda: None)
+    return loop.Autobuild(tests_runner=runner, planner=planner, hermes=lambda c, t: {"ok": True, "path": "p"}, busy=lambda: None, write=True, gate=lambda: {"ok": True})
 
 
 def test_syntax_retry_then_adopted(sb):

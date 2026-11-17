@@ -1,4 +1,4 @@
-﻿"""Nachschlagen echter API-Namen + Hermes-Review im Funktionsmodus (20261030_lookup)."""
+"""Nachschlagen echter API-Namen + Hermes-Review im Funktionsmodus (20261030_lookup)."""
 import json
 
 import nexus.autobuild.loop as L
@@ -50,7 +50,7 @@ def _ab(tmp_reviews, planner_results, monkeypatch):
     plans = iter(planner_results)
     tests = []
     ab = L.Autobuild(tests_runner=lambda a, t: tests.append(target.read_text(encoding="utf-8")) or {"ok": True, "summary": "1 passed"},
-                     planner=lambda it: next(plans), hermes=lambda c, t: {"ok": True}, busy=lambda: None,
+                     planner=lambda it: next(plans), hermes=lambda c, t: {"ok": True}, busy=lambda: None, write=True, gate=lambda: {"ok": True},
                      reviewer=lambda it, pl: next(tmp_reviews))
     return ab, item, target, tests, rel
 

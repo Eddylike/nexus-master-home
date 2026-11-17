@@ -39,6 +39,12 @@ RAM_PAUSE_PERCENT = 92
 FIRST_DELAY_SEC = 180
 RAM_LIMIT = 92.0
 MAX_ATTEMPTS_PER_ITEM = 3
+# 20261117 (Auftrag Schritt 4): Dry-Run ist Standard - der Selbstbau plant nur und loggt den Plan nach
+# cycles.jsonl (mode=dry_run). Echt-Schreiben nur mit explizitem Flag: Autobuild(write=True) oder
+# Umgebungsvariable NEXUS_AUTOBUILD_WRITE=1. Gate: Zyklen laufen nur bei gruenem Validator.
+WRITE_ENV = "NEXUS_AUTOBUILD_WRITE"
+VALIDATOR_TESTS = ["tests/test_validator_v1.py", "tests/test_validator_brokenset.py"]
+GATE_TTL_SEC = INTERVAL_SEC
 GAMES = re.compile(r"(?i)^(EscapeFromTarkov|BsgLauncher|steam_?game|cs2|FortniteClient|RocketLeague|GTA5|eldenring|bf2042|valorant|r5apex)")
 BELOW_NORMAL = 0x00004000
 from nexus.common.ai_layer import unified_num_ctx as _unified_ctx
@@ -55,6 +61,7 @@ def _anchor_hit(anchor: str, line: str) -> bool:
     except re.error:
         return False
 GPT_CTX = _unified_ctx()  # 2026-10-28: einheitlich mit Chat (kein Reload)
+GPT_TIMEOUT = 300  # 2026-11-17: Selbstbau-Plan-Timeout je Versuch
 
 
 def _now() -> str:
@@ -774,13 +781,14 @@ def _ast_excerpt(text: str, idx: int) -> str | None:
 
 def _gpt(prompt: str, fmt: str | None = "json") -> str:
     from nexus.integrations.gpt_local_agent import ask
-    r = ask(prompt, fmt=fmt, num_ctx=GPT_CTX)  # JSON erzwungen, begrenzter Kontext (gegen NO_JSON)
+    # 2026-11-17: Plan-Prompts brauchen unter RAM-Last >120s -> 300s, kein 4b-Fallback (LT-09 GPT_LOCAL_UNAVAILABLE)
+    r = ask(prompt, fmt=fmt, num_ctx=GPT_CTX, timeout=GPT_TIMEOUT, fallback=False)  # JSON erzwungen, begrenzter Kontext (gegen NO_JSON)
     for wait in (20, 40):  # voruebergehende Ollama-Fehler (Modellwechsel/RAM) -> kurz warten, erneut
         if r.get("success") or r.get("error") not in ("GPT_LOCAL_HTTP_ERROR", "GPT_LOCAL_UNAVAILABLE", "GPT_LOCAL_EMPTY_RESPONSE"):
             break
         _emit("NEXUS-GPT", "retry", f"{r.get('error')} -> neuer Versuch in {wait}s", ok=None)
         time.sleep(wait)
-        r = ask(prompt, fmt=fmt, num_ctx=GPT_CTX)
+        r = ask(prompt, fmt=fmt, num_ctx=GPT_CTX, timeout=GPT_TIMEOUT, fallback=False)
     if not r.get("success"):
         raise RuntimeError("NEXUS_GPT_FAILED:" + str(r.get("error")))
     return str(r.get("reply") or "")
@@ -1098,11 +1106,44 @@ def acceptance_check(item: dict, http_get: Callable[[str], tuple[int, str]] | No
     return {"ok": not errs, "n": len(checks), "results": results, "error": "; ".join(errs)[:300]}
 
 
+def write_enabled_default() -> bool:
+    """Echt-Schreiben nur, wenn NEXUS_AUTOBUILD_WRITE=1 gesetzt ist (Default: aus = Dry-Run)."""
+    return os.environ.get(WRITE_ENV, "").strip() == "1"
+
+
+def _gate_key() -> tuple:
+    key = []
+    for rel in ["validator/validator.py", *VALIDATOR_TESTS]:
+        try:
+            st = (ROOT / rel).stat()
+            key.append((rel, st.st_mtime_ns, st.st_size))
+        except OSError:
+            key.append((rel, None, None))
+    return tuple(key)
+
+
+def validator_gate(runner: Callable[[list[str], int], dict] | None = None) -> dict:
+    """Gate (20261117): Validator vorhanden und seine Abnahmetests gruen, sonst pausiert der Selbstbau."""
+    if not (ROOT / "validator" / "validator.py").is_file():
+        return {"ok": False, "reason": "VALIDATOR_FEHLT: validator/validator.py nicht gefunden"}
+    missing = [t for t in VALIDATOR_TESTS if not (ROOT / t).is_file()]
+    if missing:
+        return {"ok": False, "reason": f"VALIDATOR_TESTS_FEHLEN: {missing}"}
+    try:
+        r = (runner or _run_tests)(list(VALIDATOR_TESTS), 900)
+    except Exception as e:
+        return {"ok": False, "reason": f"VALIDATOR_GATE_FEHLER: {type(e).__name__}: {e}"[:300]}
+    if not r.get("ok"):
+        return {"ok": False, "reason": ("VALIDATOR_ROT: " + str(r.get("summary") or "") + " " + str(r.get("detail") or ""))[:300]}
+    return {"ok": True, "reason": ("VALIDATOR_GRUEN: " + str(r.get("summary") or ""))[:300]}
+
+
 class Autobuild:
     def __init__(self, tests_runner: Callable[[list[str], int], dict] | None = None,
                  planner: Callable[[dict], dict] | None = None, hermes: Callable[[str, str], dict] | None = None,
                  busy: Callable[[], str | None] | None = None,
-                 reviewer: Callable[[dict, dict], dict] | None = None) -> None:
+                 reviewer: Callable[[dict, dict], dict] | None = None,
+                 write: bool | None = None, gate: Callable[[], dict] | None = None) -> None:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -1112,6 +1153,9 @@ class Autobuild:
         self.hermes = hermes or _hermes_report
         self.busy = busy or system_busy
         self.reviewer = reviewer or hermes_review
+        self.write = write_enabled_default() if write is None else bool(write)  # Default: Dry-Run
+        self.gate = gate or validator_gate
+        self._gate_cache: tuple | None = None  # (key, ts, ergebnis) - nur gruene Ergebnisse
         self.last: dict | None = None
         self.running_cycle = False
 
@@ -1120,6 +1164,8 @@ class Autobuild:
         items = load_backlog()
         return {"success": True, "loop": bool(self._thread and self._thread.is_alive()), "stop_file": STOP_FILE.exists(),
                 "cycle_running": self.running_cycle, "interval_sec": INTERVAL_SEC, "last": self.last,
+                "mode": "write" if self.write else "dry_run",
+                "gate": self._gate_cache[2] if self._gate_cache else None,
                 "backlog": [{k: i.get(k) for k in ("id", "title", "status", "attempts")} for i in items]}
 
     def start(self) -> dict:
@@ -1157,6 +1203,14 @@ class Autobuild:
                         if isinstance(result, dict)
                         else None
                     )
+
+                    if state == "DRY_RUN":  # 20261117: Plan protokolliert, nichts geschrieben -> naechster Plan nach Intervall
+                        _emit("NEXUS", "status", "Dry-Run: Plan protokolliert, nichts geschrieben")
+                        break
+
+                    if state == "PAUSIERT" and result.get("gate_failed"):  # 20261117: Validator nicht gruen
+                        _emit("NEXUS", "status", "Selbstbau pausiert: Validator nicht gruen")
+                        break
 
                     if state == "NICHTS_OFFEN":
                         _emit("NEXUS", "status",
@@ -1212,30 +1266,23 @@ class Autobuild:
 
     def _cycle(self, item_id, full_suite) -> dict:
         cid = datetime.now().strftime("%Y%m%d_%H%M%S")
-        rec: dict[str, Any] = {"cycle": cid, "ts": _now()}
-        # Phase 8: Vulnerabilitätserkennung am Zyklus-Anfang
-        try:
-            items = load_backlog()
-            recurring = [i for i in items if i.get("auto_key") and i.get("count", 0) >= 2 and str(i.get("status")) == "offen"]
-            if recurring:
-                rec["vulnerability_warning"] = f" {len(recurring)} wiederkehrende Fehler erkannt"
-                _emit("NEXUS", "analysis", f"Wiederkehrende Fehler erkannt: {len(recurring)} offene Punkte")
-                # Protokolliere an Dashboard
-                from nexus.dashboard import log_error
-                for r in recurring[:3]:
-                    log_error(f"SB-AUTO-{r['id']}", r.get("title", "Unbekannt"), str(r.get("logs", [])[:200]))
-            else:
-                rec["vulnerability_warning"] = None
-        except Exception as e:
-            rec["vulnerability_warning"] = f"check_failed:{e}"
-        try:
-            self._flush_pending()
-        except Exception:
-            pass
+        rec: dict[str, Any] = {"cycle": cid, "ts": _now(), "mode": "write" if self.write else "dry_run"}
+        if self.write:  # Dry-Run: keine nachgelieferten Hermes-Berichte/Dateien
+            try:
+                self._flush_pending()
+            except Exception:
+                pass
         busy = self.busy()
         if busy:
             rec.update(result="PAUSIERT", reason=busy)
             _emit("NEXUS", "skip", f"Selbstbau pausiert: {busy}")
+            return self._finish(rec)
+        gate = self._check_gate()  # 20261117: nur bei gruenem Validator weiter
+        rec["gate"] = {"ok": bool(gate.get("ok")), "reason": str(gate.get("reason") or "")[:300]}
+        if not gate.get("ok"):
+            rec.update(result="PAUSIERT", paused=True, gate_failed=True,
+                       reason=str(gate.get("reason") or "VALIDATOR_NICHT_GRUEN")[:300])
+            _emit("NEXUS", "skip", f"Selbstbau pausiert (Validator): {rec['reason'][:160]}", ok=False)
             return self._finish(rec)
         items = load_backlog()
         # 2026-10-28 chatplan: Phase-2-Items erst freigeben, wenn alle Phase-1-Items erledigt (PASS) sind
@@ -1244,12 +1291,16 @@ class Autobuild:
             for i in items:
                 if i.get("phase") == 2 and i.get("status") == "wartet_phase1":
                     i["status"] = "offen"
-            save_backlog(items)
+            if self.write:
+                save_backlog(items)
         item = pick_next_item(items, item_id)
         if item is None:
-            save_backlog(items)
+            if self.write:
+                save_backlog(items)
             rec.update(result="NICHTS_OFFEN")
             return self._finish(rec)
+        if not self.write:
+            return self._dry_run(rec, item)
         rec.update(item=item["id"], title=item["title"])
         try:
             sc = ensure_target_scaffold(item)
@@ -1410,6 +1461,57 @@ class Autobuild:
         save_backlog(items)
         return self._finish(rec)
 
+    def _check_gate(self) -> dict:
+        """Validator-Gate mit Cache: ein gruenes Ergebnis gilt GATE_TTL_SEC, solange Validator/Tests unveraendert."""
+        key = _gate_key()
+        c = self._gate_cache
+        if c and c[0] == key and time.time() - c[1] < GATE_TTL_SEC and c[2].get("ok"):
+            return c[2]
+        try:
+            res = self.gate() or {}
+        except Exception as e:
+            res = {"ok": False, "reason": f"VALIDATOR_GATE_FEHLER: {type(e).__name__}: {e}"}
+        res = {"ok": bool(res.get("ok")), "reason": str(res.get("reason") or "")[:300]}
+        self._gate_cache = (key, time.time(), res) if res["ok"] else None
+        return res
+
+    def _dry_run(self, rec: dict, item: dict) -> dict:
+        """Dry-Run (Standard, 20261117): nur planen; kein Scaffold, kein Patch, kein Backlog-/Repo-Schreiben.
+        Der Plan landet ausschliesslich in cycles.jsonl (mode=dry_run)."""
+        it = dict(item)
+        rec.update(item=it.get("id"), title=it.get("title"), mode="dry_run")
+        plan_rec: dict[str, Any] = {"file": it.get("file"), "tests": it.get("tests")}
+        try:
+            if (it.get("auto_key") or it.get("status") == "freigegeben") and not it.get("file"):
+                loc = locate_source(it)
+                if loc:
+                    it["file"], it["anchor"] = loc
+                    plan_rec["file"] = loc[0]
+            plan = self.planner(it)
+            plan_rec["plan_mode"] = plan.get("mode")
+            res = plan.get("result")
+            if plan.get("mode") == "analysis":
+                plan_rec["analyse"] = res
+            else:
+                res = res if isinstance(res, dict) else {}
+                edits = res.get("edits") or []
+                plan_rec["begruendung"] = res.get("begruendung")
+                plan_rec["edits"] = [{"file": e.get("file") or e.get("path") or e.get("datei"),
+                                      "kind": "function" if any(k in e for k in ("function", "funktion", "name")) else "patch"}
+                                     for e in edits if isinstance(e, dict)]
+                try:
+                    plan_rec["would_change"] = sorted(str(t.relative_to(ROOT)).replace("\\", "/")
+                                                      for t in _compute_edits(edits))
+                except Exception as e:
+                    plan_rec["plan_error"] = f"{type(e).__name__}:{e}"[:300]
+        except Exception as e:
+            plan_rec["plan_error"] = f"PLAN_FAILED:{type(e).__name__}:{e}"[:300]
+        rec["plan"] = plan_rec
+        rec["result"] = "DRY_RUN"
+        _emit("NEXUS", "plan", f"Dry-Run {it.get('id')}: Plan protokolliert, nichts geschrieben",
+              data={"would_change": plan_rec.get("would_change")})
+        return self._finish(rec)
+
     def _rollback(self, backups) -> None:
         for target, b in backups:
             if b is None:
@@ -1443,13 +1545,14 @@ class Autobuild:
         _write(PENDING, json.dumps(rest, ensure_ascii=False))
 
     def _finish(self, rec: dict) -> dict:
-        rec["success"] = rec.get("result") in ("UEBERNOMMEN", "ANALYSIERT", "PAUSIERT", "NICHTS_OFFEN", "SKIPPED")
+        rec["success"] = rec.get("result") in ("UEBERNOMMEN", "ANALYSIERT", "PAUSIERT", "NICHTS_OFFEN", "SKIPPED", "DRY_RUN")
+        dry = rec.get("mode") == "dry_run"
         line = (f"\n## Zyklus {rec['cycle']} ({rec['ts']})\n- Punkt: {rec.get('item','-')} {rec.get('title','')}\n"
                 f"- Ergebnis: **{rec.get('result')}** {rec.get('reason','')}\n- Geaendert: {rec.get('changed', [])}\n"
                 f"- Tests Ziel: {(rec.get('test_target') or {}).get('summary','-')} | Suite: {(rec.get('test_full') or {}).get('summary','-')}\n")
         if rec.get("analyse"):
             line += "- Analyse NEXUS GPT: " + json.dumps(rec["analyse"], ensure_ascii=False)[:1500] + "\n"
-        if rec.get("item"):
+        if rec.get("item") and not dry:  # Dry-Run: kein Hermes-Bericht
             h = self.hermes(rec["cycle"], "# Autobuild " + rec["cycle"] + "\n" + line)
             rec["hermes"] = h
             if h.get("deferred"):
@@ -1463,7 +1566,8 @@ class Autobuild:
             _emit("Hermes", "result", f"Zyklusbericht {'abgelegt' if h.get('ok') else ('zurueckgestellt (Wartung)' if h.get('deferred') else 'FEHLER ' + str(h.get('error')))}: {h.get('path')}",
                   ok=h.get("ok") if not h.get("deferred") else None, data={k: h.get(k) for k in ("status", "error", "attempt", "sha256")})
             line += f"- Hermes-Bericht: {h.get('path')} ({'OK' if h.get('ok') else 'FEHLER ' + str(h.get('error',''))})\n"
-        _write(PROGRESS, line, "a")
+        if not dry:  # Dry-Run schreibt nur cycles.jsonl
+            _write(PROGRESS, line, "a")
         _write(CYCLES, json.dumps(rec, ensure_ascii=False, default=str) + "\n", "a")  # inkl. Hermes-Ergebnis
         self.last = rec
         return rec

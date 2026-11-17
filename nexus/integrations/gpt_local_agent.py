@@ -59,7 +59,7 @@ def health() -> dict[str, Any]:
 
 
 def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx: int | None = None,
-        system: str | None = None) -> dict[str, Any]:
+        system: str | None = None, timeout: int | None = None, fallback: bool = True) -> dict[str, Any]:
     text = (message or "").strip()
     if not text:
         return {**_base(), "success": False, "reply": "", "error": "MESSAGE_REQUIRED"}
@@ -91,7 +91,7 @@ def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
+        with urllib.request.urlopen(req, timeout=int(timeout or TIMEOUT)) as response:
             data = json.loads(response.read().decode("utf-8"))
         reply = str(((data.get("message") or {}).get("content") or "")).strip()
         if not reply:
@@ -100,8 +100,9 @@ def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx
     except urllib.error.HTTPError as exc:
         return {**_base(), "success": False, "reply": "", "error": "GPT_LOCAL_HTTP_ERROR", "http_status": exc.code, "error_type": type(exc).__name__}
     except (OSError, urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-        if not _model:
-            return ask(message, FALLBACK_MODEL, fmt=fmt, num_ctx=num_ctx, system=system)
+        # 2026-11-17: fallback=False (Selbstbau) -> kein 9b->4b-Wechsel bei Timeout, kostet nur Ladezeit
+        if not _model and fallback:
+            return ask(message, FALLBACK_MODEL, fmt=fmt, num_ctx=num_ctx, system=system, timeout=timeout)
         return {**_base(), "success": False, "reply": "", "error": "GPT_LOCAL_UNAVAILABLE", "error_type": type(exc).__name__}
 
 
@@ -172,7 +173,7 @@ def _web(text: str) -> dict[str, Any] | None:
 
 
 def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx: int | None = None,
-        system: str | None = None) -> dict[str, Any]:
+        system: str | None = None, timeout: int | None = None, fallback: bool = True) -> dict[str, Any]:
     text = (message or "").strip()
     if text and not _IN_TOOL.get() and _model is None and fmt is None and system is None:
         try:
@@ -182,7 +183,7 @@ def ask(message: str, _model: str | None = None, fmt: str | None = None, num_ctx
         except Exception as exc:  # ehrlich melden, kein Chat-Fallback ohne Web
             return {**_base(), "success": False, "reply": "", "mode": "local/ollama+web", "error": "GPT_WEB_TOOLS_FAILED",
                     "error_type": type(exc).__name__}
-    return _ask_base(message, _model, fmt=fmt, num_ctx=num_ctx, system=system)
+    return _ask_base(message, _model, fmt=fmt, num_ctx=num_ctx, system=system, timeout=timeout, fallback=fallback)
 
 
 def tool_ask(task: str) -> dict[str, Any]:

@@ -37,7 +37,10 @@ LIVE_SYSTEM = (
     "Grundwissen (nicht erfinden, nichts dazudichten): Eddie Schulz, lebt in Gelsenkirchen, Content Creator und "
     "Industriefotograf; drei Hunde (Nelly, ein Rottweiler, ein Great-Dane-Boxer-Mix). NEXUS laeuft lokal auf seinem "
     "Windows-PC (WoZiPC), das Handy ist ein Xiaomi Redmi Note 13. Ton: direkt, klar, auf Augenhoehe, kein "
-    "Kundenservice-Slang. Wenn du etwas nicht weisst, sag das in einem kurzen Satz."
+    "Kundenservice-Slang. Wenn du etwas nicht weisst, sag das in einem kurzen Satz. "
+    "Sag nie, eine App sei geoeffnet oder eine Nachricht geschrieben oder gesendet, wenn das nicht aus dem "
+    "echten Pfad kommt; sag stattdessen, wie Eddie es formulieren kann (zum Beispiel: Oeffne WhatsApp, "
+    "Schreib Anna Hallo)."
 )
 LIVE_MODEL = "qwen3.5:9b"  # fest, unabhaengig vom UI-Fallback auf 4b
 _PHONE_CTX = re.compile(
@@ -81,7 +84,7 @@ def _voice_norm(text: str) -> str:
     return t
 
 
-def _spoken_result(result: dict) -> str:
+def _spoken_result(result: dict, full: bool = False) -> str:
     """Kurze, sprechbare Bestaetigung aus der echten Orchestrator-Antwort. Kein Fake-Erfolg."""
     try:
         from nexus.livetalk.engines import speakable
@@ -90,6 +93,8 @@ def _spoken_result(result: dict) -> str:
         text = re.sub(r"\s+", " ", str((result or {}).get("reply") or "")).strip()
     if not text:
         return "Der Befehl kam ohne Antwort zurueck."
+    if full:  # z. B. Nachrichten vorlesen: komplette Liste, nur hart begrenzt
+        return text if len(text) <= 1200 else text[:1200].rsplit(" ", 1)[0] + " ..."
     parts, out = re.split(r"(?<=[.!?])\s+", text), []
     for part in parts:
         if not part:
@@ -117,13 +122,21 @@ def _is_action(text: str) -> bool:
     return intent == "ui" and (d or {}).get("action") == "close_pages"
 
 
-def _phone_command(text: str, from_phone: bool = True) -> dict | None:
+def _phone_command(text: str, from_phone: bool = True, link=None) -> dict | None:
     """Bestehende Handy-Intents plus uebliche Assistenten-Befehle; ohne 'am PC' am Handy."""
     t = _voice_norm(text)
-    msg = _phone_msg_command(t)
+    msg = _phone_msg_command(t, link)
     if msg:
         return msg
     if from_phone and not _wants_pc(t):
+        q = _open_question_app(t)
+        if q:  # "Kannst du WhatsApp oeffnen?" -> echt oeffnen statt nur behaupten
+            try:
+                from nexus.phone_actions import find_phone_app
+                found = find_phone_app(q)
+            except Exception:
+                found = None
+            return {"intent": "open_phone_app", "app": found[0] if found else q, "text": t}
         try:
             from nexus.phone_voice import parse as _pv_parse
             cmd = _pv_parse(t)
@@ -172,8 +185,24 @@ def _run_phone(cmd: dict, meta: dict | None = None) -> dict:
             except Exception:
                 items = link.fresh_notifications()
         from nexus.livetalk.phone_link import speak_notifications
+        _remember_last_sender(link, items)
         return {"success": True, "reply": speak_notifications(items), "count": len(items or [])}
+    if intent in ("phone_write", "phone_write_followup"):
+        r = _run_write(cmd, link)
+        if not r.get("success") and r.get("fallback_ok") and cmd.get("explicit_wa"):
+            # keine passende Benachrichtigung: bestehender WhatsApp-Weg (nexus.voice.commands), unveraendert
+            try:
+                from nexus.voice import commands as vc
+                p = vc.parse(str(cmd.get("text") or ""))
+                if p.get("intent") == "whatsapp_send":
+                    return vc._whatsapp_flow(p, "livetalk")
+            except Exception:
+                pass
+        return r
     if intent == "phone_prepare_reply":
+        return _run_write({"intent": "phone_write", "who": cmd.get("who") or "", "body": cmd.get("body") or "",
+                           "split": True}, link)
+    if intent == "phone_prepare_reply_legacy":
         if link is None:
             return {"success": False, "reply": "Die Handy-Bruecke ist gerade nicht verbunden."}
         who, body = str(cmd.get("who") or "").strip(), str(cmd.get("body") or "").strip()
@@ -195,18 +224,46 @@ def _run_phone(cmd: dict, meta: dict | None = None) -> dict:
         link.pending_reply = {"id": notif.get("id"), "who": who, "body": body}
         return {"success": True, "reply": spoken, "pending": True}
     if intent == "phone_confirm_send":
-        if link is None or not getattr(link, "pending_reply", None):
-            return {"success": False, "reply": "Es liegt keine Antwort zum Senden vor."}
-        res = link.request("confirm_send") or {}
-        ok = res.get("ok") if "ok" in res else res.get("success", True)
-        link.pending_reply = None
-        if ok is False:
-            return {"success": False, "reply": "Das Senden hat nicht geklappt."}
-        return {"success": True, "reply": "Die Antwort ist unterwegs."}
+        if link is not None and getattr(link, "pending_reply", None):
+            who = str((link.pending_reply or {}).get("who") or "").strip()
+            res = link.request("confirm_send")
+            if res is None:
+                link.pending_reply = None
+                return {"success": False, "error": "no_result",
+                        "reply": "Vom Handy kam keine Rueckmeldung. Ich weiss nicht, ob die Antwort raus ist."}
+            inner = _result_obj(res)
+            if res.get("ok") is False or inner.get("ok") is False:
+                err = str(inner.get("error") or res.get("error") or "")
+                if err == "too_fast_confirm":
+                    return {"success": False, "error": err, "reply": "Sag bitte nochmal senden."}
+                link.pending_reply = None
+                if err == "notification_gone":
+                    return {"success": False, "error": err, "reply": f"Die Nachricht von {who or 'dem Kontakt'} "
+                            "ist nicht mehr in der Statusleiste, deshalb konnte ich nicht antworten."}
+                return {"success": False, "error": err or "send_failed", "reply": "Das Senden hat nicht geklappt."}
+            link.pending_reply = None
+            return {"success": True, "reply": f"Die Antwort an {who} ist unterwegs." if who else "Die Antwort ist unterwegs."}
+        try:  # offener Entwurf aus dem bestehenden WhatsApp-Weg (nexus.voice.commands)
+            from nexus.voice import commands as vc
+            pid = next(iter(vc._pending), None) if getattr(vc, "_pending", None) else None
+            if pid:
+                return vc.handle_confirm({"id": pid, "answer": "ja"}, None)
+        except Exception:
+            pass
+        return {"success": False, "reply": "Es liegt keine Antwort zum Senden vor."}
     if intent == "phone_cancel_send":
+        try:
+            from nexus.voice import commands as vc
+            pid = next(iter(vc._pending), None) if getattr(vc, "_pending", None) else None
+            if pid:
+                vc.handle_confirm({"id": pid, "answer": "nein"}, None)
+        except Exception:
+            pass
         if link is not None:
+            link.pending_write = None
             try:
-                link.request("cancel_reply", timeout=2.0)
+                if getattr(link, "pending_reply", None):
+                    link.request("cancel_reply", timeout=2.0)
             except Exception:
                 pass
             link.pending_reply = None
@@ -338,7 +395,7 @@ def _needs_web(text: str) -> bool:
     t = _voice_norm(raw)
     if re.search(r"\bwas\s+machen\s+(wir|wir uns|uns)\s+heute\b", t, re.I):
         return False
-    if re.search(r"\b(lies|lese|vorlesen)\s+(mir\s+)?(meine\s+)?(nachrichten|benachrichtigungen)\b", t, re.I):
+    if _is_read_notifications(t):
         return False
     if _WEB_RX.search(t):
         return True
@@ -352,18 +409,51 @@ def _needs_web(text: str) -> bool:
     return False
 
 
-def _phone_msg_command(text: str) -> dict | None:
+def _is_read_notifications(text: str) -> bool:
+    """Erkennt Vorlese-/Schau-Befehle fuer Handy- und WhatsApp-Nachrichten, inkl. STT-Varianten.
+
+    Unscharf genug fuer typische STT-Verhoerer (liegt/lieg/liest statt lies, '... vor'),
+    aber nur wenn Nachricht/Benachrichtigung/WhatsApp im Satz vorkommt. Nachrichten-Lage
+    ohne Vorlese-Hinweis bleibt Websuche.
+    """
+    low = _voice_norm(text).strip().lower()
+    if not low:
+        return False
+    has_topic = bool(re.search(
+        r"\b(b?e?nachrichtigung(?:en)?|belachrichtigung(?:en)?|nachricht(?:en)?|"
+        r"notifications?|whats?app)\b",
+        low,
+    ))
+    if not has_topic:
+        return False
+    has_read = bool(re.search(
+        r"\b(lies[t]?|lieg(?:t)?|lese|vorlesen|vor\s*lesen|"
+        r"zeig(?:e|en)?|guck(?:e|en)?|schau(?:e|en)?|check(?:en)?|"
+        r"pruefe|pruefen|prüfe|ansehen)\b",
+        low,
+    ))
+    has_vor = bool(re.search(r"\bvor\s*[.!?]*\s*$", low))
+    mine = bool(re.search(r"\b(meine[rns]?|mir|handy)\b", low))
+    if not (has_read or has_vor or mine):
+        return False
+    news = bool(re.search(
+        r"\b(welt|deutschland|politik|sport|bundesliga|schlagzeilen)\b", low
+    ))
+    if news and not (has_read or has_vor or mine or re.search(r"\bwhats?app\b", low)
+                     or re.search(r"\b(benachrichtigung|belachrichtigung|handy)\b", low)):
+        return False
+    return True
+
+
+def _phone_msg_command(text: str, link=None) -> dict | None:
     t = _voice_norm(text).strip()
     low = t.lower()
     if re.fullmatch(r"\W*(senden|absenden|send(?:en)?|abschicken|los(?:schicken)?)\W*", low):
         return {"intent": "phone_confirm_send", "text": t}
     if re.fullmatch(r"\W*(abbrechen|nicht senden|abbrechen\s+bitte|cancel)\W*", low):
         return {"intent": "phone_cancel_send", "text": t}
-    if re.search(r"\b(lies|lese|vorlesen|zeig(?:e)?)\s+(mir\s+)?(meine\s+)?(nachrichten|benachrichtigungen|notifications)\b", low):
+    if _is_read_notifications(t):
         return {"intent": "phone_read_notifications", "text": t}
-    m = re.match(r"^\W*(antworte?|antwort(?:en)?(?:\s+an)?)\s+([^:]+)\s*:\s*(.+)$", t, re.I)
-    if m:
-        return {"intent": "phone_prepare_reply", "who": m.group(2).strip(), "body": m.group(3).strip(), "text": t}
     m = re.search(
         r"\b(?:schick|sende|schicke)\s+(?:mir\s+)?(?:die\s+|den\s+|das\s+)?(?:datei\s+)?(.+?)\s+"
         r"(?:aufs|auf\s+das|auf\s+dem|ans)\s+handy\b",
@@ -377,7 +467,346 @@ def _phone_msg_command(text: str) -> dict | None:
         low,
     ):
         return {"intent": "phone_describe_photo", "text": t}
+    w = _parse_write(t, link)
+    if w:
+        return w
     return None
+
+
+# --- Schreiben per Sprache: Antwort ueber die Benachrichtigung (RemoteInput der App) -------------
+# Reihenfolge: Statusleisten-Benachrichtigung mit Antworten-Aktion gewinnt. Nur wenn keine passt und
+# der Satz ausdruecklich WhatsApp nennt, bleibt der bestehende WhatsApp-Weg aus nexus.voice.commands
+# (whatsapp_send / _whatsapp_flow) zustaendig, unveraendert. Hier werden keine Kontakte/Nummern gelesen.
+WRITE_TTL_S = 90
+_WRITE_VERB = (r"(?:schreib(?:e|t|en|st)?|antworte(?:t|n)?|antwort(?:en)?|schick(?:e|t|en)?|"
+               r"sende(?:t)?|send)")
+_SAG_VERB = r"(?:sag(?:e|t)?)"
+_WA_WORD = r"(?:whats\s?app|watsapp|whatsup|what'?s\s?app)"
+_NOT_NAME = {
+    "mir", "mich", "uns", "das", "es", "was", "dir", "dich", "auf", "bitte", "mal", "doch", "noch",
+    "ein", "eine", "einen", "einem", "die", "der", "den", "dem", "nachricht", "nachrichten", "nichts",
+    "alles", "zurueck", "zur\u00fcck", "jetzt", "gerade", "dann", "an", "weiter", "ab", "dazu", "darauf",
+    "datei", "foto", "bild", "bescheid", "senden", "ja", "nein", "hallo", "wie", "wo", "wann", "warum",
+    "wer", "welche", "welcher", "welches", "kurz", "gedicht", "text", "email", "e-mail", "mail", "notiz",
+    "liste", "code", "brief", "auch", "so", "ihr", "ihm", "ihnen", "ihn", "sie", "er",
+}
+_PRON_LAST = r"(?:ihr|ihm|ihnen|ihn)"
+
+
+def _write_clean_body(s: str) -> str:
+    s = re.sub(r"\s+", " ", str(s or "")).strip(" ,;:")
+    s = re.sub(r"^(?:dass|das)\s+", "", s, flags=re.I)
+    return s.strip().rstrip(".").strip()
+
+
+def _parse_write(text: str, link=None) -> dict | None:
+    """'Schreib(t)/Antworte/Schick <Name> <Text>', 'Antworte ihr ...', 'Schreib eine Nachricht' -> phone_write.
+
+    'Sag <Name> ...' nur mit Trenner/'dass' oder wenn <Name> zu einem Absender in der Statusleiste passt.
+    """
+    t = _voice_norm(text)
+    t = re.sub(r"^\W*(?:(?:hey|hallo|ok|okay|also|und)\W+)?(?:nexus\W+)?", "", t, flags=re.I)
+    m = re.match(rf"^(?:bitte\s+)?(?P<verb>{_WRITE_VERB}|{_SAG_VERB})(?![\w\u00e4\u00f6\u00fc\u00df])\s*(?P<rest>.*)$",
+                 t, re.I | re.S)
+    if not m:
+        return None
+    verb, rest = m.group("verb").lower(), m.group("rest").strip()
+    is_sag = verb.startswith("sag")
+    for _ in range(3):
+        rest = re.sub(r"^(?:mal|bitte|doch|noch|kurz)\s+", "", rest, flags=re.I)
+    if re.search(r"\b(?:aufs|ans)\s+handy\b|\bauf\s+(?:das|dem)\s+handy\b", rest, re.I):
+        return None  # Datei aufs Handy schicken
+    generic = False
+    mm = re.match(rf"^(?:(?:eine?|ne)\s+)?(?:nachricht|{_WA_WORD})(?:\s+|$)", rest, re.I)
+    if mm:
+        rest, generic = rest[mm.end():], True
+    rest = re.sub(r"^(?:an|zu|f\u00fcr|fuer)\s+", "", rest, flags=re.I)
+    rest = re.sub(rf"\s*\b(?:auf|per|\u00fcber|ueber|via|bei|in|mit)\s+{_WA_WORD}\b", "", rest, flags=re.I)
+    rest = rest.strip(" ,.;!?")
+    explicit_wa = bool(re.search(_WA_WORD, t, re.I))
+    base = {"intent": "phone_write", "text": t, "explicit_wa": explicit_wa}
+    if not rest:
+        if is_sag or not generic and verb.startswith(("send", "schick")):
+            return None
+        return dict(base, who="", body="", split=True)
+    pm = re.match(rf"^{_PRON_LAST}\b[\s,:]*(?:zur\u00fcck\s+|zurueck\s+)?(.*)$", rest, re.I)
+    if pm:
+        return dict(base, who="", who_ref="last", body=_write_clean_body(pm.group(1)), split=True)
+    first = rest.split()[0].strip(",.:;!?").lower()
+    if first in _NOT_NAME:
+        return None
+    sm = re.match(r"^(?P<who>[^,:;]+?)\s*(?:[,:;]\s*|\s+(?:dass|das)\s+)(?P<body>.+)$", rest)
+    if sm and len(sm.group("who").split()) <= 3:
+        return dict(base, who=sm.group("who").strip(), body=_write_clean_body(sm.group("body")), split=True)
+    if is_sag:
+        # nur wenn der Name zu einem aktuellen Absender passt (kein Kapern von "sag Hallo")
+        if link is None or not _match_senders(_write_candidates(link, live=False), rest)[0]:
+            return None
+    return dict(base, who=rest, body="", split=False)
+
+
+def _fold_name(s: str) -> str:
+    t = str(s or "").lower()
+    for a, b in (("\u00e4", "ae"), ("\u00f6", "oe"), ("\u00fc", "ue"), ("\u00df", "ss")):
+        t = t.replace(a, b)
+    t = re.sub(r"[^a-z ]", "", t)
+    for a, b in (("th", "t"), ("ph", "f"), ("ck", "k"), ("c", "k"), ("y", "i"), ("ie", "i"), ("ee", "e"),
+                 ("dt", "t"), ("tz", "z"), ("w", "v")):
+        t = t.replace(a, b)
+    t = re.sub(r"(.)\1+", r"\1", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _name_score(said: str, sender: str) -> float:
+    from difflib import SequenceMatcher
+    a, b = _fold_name(said), _fold_name(sender)
+    if not a or not b:
+        return 0.0
+    if a == b:
+        return 1.0
+    best = SequenceMatcher(None, a, b).ratio()
+    btoks = b.split()
+    for tok in btoks:
+        best = max(best, SequenceMatcher(None, a, tok).ratio())
+    if len(a.split()) == 1 and btoks and btoks[0].startswith(a) and len(a) >= 3:
+        best = max(best, 0.9)
+    return best
+
+
+def _sender_name(n: dict) -> str:
+    who = str(n.get("sender") or n.get("title") or "").strip()
+    return re.sub(r"\s*\(\d+\s+nachrichten?\)\s*$", "", who, flags=re.I).strip()
+
+
+def _write_candidates(link, live: bool = True) -> list[dict]:
+    """Nachrichten-Benachrichtigungen (neueste zuerst), nicht eigene. Keine Kontaktliste."""
+    items: list[dict] = []
+    if link is None:
+        return items
+    try:
+        items = link.notifications_live() if live else link.fresh_notifications()
+    except Exception:
+        try:
+            items = link.fresh_notifications()
+        except Exception:
+            items = []
+    try:
+        from nexus.livetalk.notif_util import is_message
+    except Exception:
+        is_message = lambda n: True  # noqa: E731
+    out = []
+    for n in items or []:
+        if not isinstance(n, dict) or n.get("from_self") or n.get("own"):
+            continue
+        if not is_message(n) and not n.get("can_reply"):
+            continue
+        if _sender_name(n):
+            out.append(n)
+    return out
+
+
+_MATCH_MIN = 0.74
+
+
+def _match_senders(cands: list[dict], who: str) -> tuple[list[tuple[str, dict, float]], str]:
+    """-> (Treffer je Absender sortiert, Rest-Text). who darf den Text noch enthalten (split=False)."""
+    words = str(who or "").split()
+    if not words or not cands:
+        return [], ""
+    best: dict[str, tuple[str, dict, float, int]] = {}
+    for k in range(min(3, len(words)), 0, -1):
+        said = " ".join(words[:k])
+        for n in cands:
+            name = _sender_name(n)
+            sc = _name_score(said, name)
+            # auch "Sender in Gruppe": nur den Absender vergleichen
+            if " in " in name:
+                sc = max(sc, _name_score(said, name.split(" in ", 1)[0]))
+            if sc < _MATCH_MIN:
+                continue
+            key = _fold_name(name)
+            cur = best.get(key)
+            prefer = (n.get("can_reply") is True) and not (cur and cur[1].get("can_reply") is True)
+            if cur is None or sc > cur[2] + 1e-9 or (abs(sc - cur[2]) < 1e-9 and (k > cur[3] or prefer)):
+                best[key] = (name, n, sc, k)
+    if not best:
+        return [], ""
+    ranked = sorted(best.values(), key=lambda x: (-x[2], -x[3]))
+    rest = " ".join(words[ranked[0][3]:])
+    return [(r[0], r[1], r[2]) for r in ranked], rest
+
+
+def _pending_write(link) -> dict | None:
+    pw = getattr(link, "pending_write", None) if link is not None else None
+    if not pw:
+        return None
+    import time as _t
+    if _t.time() - float(pw.get("ts") or 0) > WRITE_TTL_S:
+        try:
+            link.pending_write = None
+        except Exception:
+            pass
+        return None
+    return pw
+
+
+def _set_pending_write(link, **kw) -> None:
+    import time as _t
+    if link is not None:
+        try:
+            link.pending_write = dict(kw, ts=_t.time())
+        except Exception:
+            pass
+
+
+def _result_obj(res) -> dict:
+    """phone_result der Seite: {'ok': true, 'result': <Bridge-JSON als String/Objekt>}."""
+    import json as _json
+    if not isinstance(res, dict):
+        return {}
+    inner = res.get("result")
+    if isinstance(inner, str):
+        try:
+            inner = _json.loads(inner)
+        except Exception:
+            inner = None
+    return inner if isinstance(inner, dict) else {}
+
+
+def _prepare_reply(link, notif: dict, who: str, body: str) -> dict:
+    if notif.get("can_reply") is False and not any(
+            (a or {}).get("remote") for a in (notif.get("actions") or []) if isinstance(a, dict)):
+        return {"success": False, "reply": f"Auf die Nachricht von {who} kann ich nicht direkt antworten. "
+                                           f"Die Benachrichtigung hat keine Antworten-Funktion."}
+    res = link.request("prepare_reply", id=notif.get("id") or notif.get("key"), text=body)
+    if res is None:
+        return {"success": False, "reply": "Die Live-Talk-App am Handy hat nicht geantwortet. Ich habe nichts vorbereitet."}
+    inner = _result_obj(res)
+    if res.get("ok") is False or inner.get("ok") is False:
+        err = inner.get("error") or res.get("error") or ""
+        if err == "not_found":
+            msg = (f"Die Nachricht von {who} liegt der Live-Talk-App gerade nicht vor, deshalb kann ich ihr nicht "
+                   f"direkt antworten.")
+        elif err == "no_remote_input":
+            msg = f"Auf die Nachricht von {who} kann ich nicht direkt antworten."
+        else:
+            msg = "Die Antwort konnte ich am Handy nicht vorbereiten."
+        return {"success": False, "reply": msg, "error": err or "prepare_failed"}
+    import time as _t
+    link.pending_reply = {"id": notif.get("id") or notif.get("key"), "who": who, "body": body, "ts": _t.time()}
+    try:
+        link.pending_write = None
+    except Exception:
+        pass
+    return {"success": True, "reply": f"Antwort an {who}: {body}. Sag senden, wenn ich sie abschicken soll.",
+            "pending": True}
+
+
+def _no_reply_target(who: str) -> dict:
+    return {"success": False, "error": "no_notification",
+            "reply": (f"Ich kann {who} gerade nur antworten, wenn eine Nachricht von {who} in der Statusleiste liegt. "
+                      f"Gerade finde ich keine.")}
+
+
+def _run_write(cmd: dict, link) -> dict:
+    """Empfaenger aus der Statusleiste, Entwurf vorlesen, senden erst nach 'senden'."""
+    intent = cmd.get("intent")
+    pw = _pending_write(link) or {}
+    if intent == "phone_write_followup":
+        said = _write_clean_body(cmd.get("text") or "")
+        if not said:
+            return {"success": False, "reply": "Ich habe nichts verstanden. Sag es bitte nochmal oder sag abbrechen."}
+        if pw.get("stage") == "body":
+            cmd = {"intent": "phone_write", "who": pw.get("who") or "", "body": said, "split": True,
+                   "notif_id": pw.get("notif_id")}
+        else:
+            said = re.sub(r"^(?:an|zu|f\u00fcr|fuer)\s+", "", said, flags=re.I)
+            sm = re.match(r"^(?P<who>[^,:;]+?)\s*(?:[,:;]\s*|\s+(?:dass|das)\s+)(?P<body>.+)$", said)
+            if sm and len(sm.group("who").split()) <= 3:
+                cmd = {"intent": "phone_write", "who": sm.group("who"), "body": _write_clean_body(sm.group("body")),
+                       "split": True}
+            else:
+                cmd = {"intent": "phone_write", "who": said, "body": pw.get("body") or "", "split": False,
+                       "keep_body": True}
+    if link is None:
+        return {"success": False, "reply": "Die Handy-Bruecke ist gerade nicht verbunden."}
+    who, body = str(cmd.get("who") or "").strip(), str(cmd.get("body") or "").strip()
+    cands = _write_candidates(link, live=True)
+    if cmd.get("who_ref") == "last" and not who:
+        who = str(getattr(link, "last_sender", "") or "")
+        if not who:
+            return {"success": False, "reply": "Ich weiss nicht, wem ich antworten soll. Sag bitte den Namen dazu."}
+        cmd = dict(cmd, split=True)
+    if not who:
+        _set_pending_write(link, stage="who", body=body)
+        return {"success": True, "reply": "An wen soll die Nachricht gehen?", "pending_write": True}
+    if cmd.get("notif_id"):
+        hit = next((n for n in cands if str(n.get("id") or n.get("key")) == str(cmd["notif_id"])), None)
+        matches = [(_sender_name(hit), hit, 1.0)] if hit else []
+        rest = ""
+    else:
+        matches, rest = _match_senders(cands, who)
+    if not cmd.get("split") and matches:
+        extra = _write_clean_body(rest)
+        if cmd.get("keep_body") and body:
+            body = (body + " " + extra).strip() if extra else body
+        else:
+            body = extra or body
+    if not matches:
+        spoken_who = who if cmd.get("split") else " ".join(who.split()[:1])
+        return {"success": False, "fallback_ok": True, **_no_reply_target(spoken_who)}
+    top = matches[0]
+    close = [m for m in matches if m[2] >= top[2] - 0.05]
+    if len(close) > 1:
+        names = [m[0] for m in close[:3]]
+        _set_pending_write(link, stage="who", body=body)
+        return {"success": True, "pending_write": True,
+                "reply": "Meinst du " + ", ".join(names[:-1]) + " oder " + names[-1] + "?"}
+    name, notif = top[0], top[1]
+    if not body:
+        _set_pending_write(link, stage="body", who=name, notif_id=notif.get("id") or notif.get("key"))
+        return {"success": True, "pending_write": True, "reply": f"Was soll ich {name} schreiben?"}
+    return _prepare_reply(link, notif, name, body)
+
+
+def _remember_last_sender(link, items) -> None:
+    if link is None:
+        return
+    try:
+        from nexus.livetalk.notif_util import is_message, rank_notifications
+        for n in rank_notifications(items or []):
+            if is_message(n) and not n.get("from_self") and _sender_name(n):
+                link.last_sender = _sender_name(n)
+                return
+    except Exception:
+        pass
+
+
+_OPEN_Q = re.compile(
+    r"^\W*(?:(?:hey|hallo|ok|okay|also)\W+)?(?:nexus\W+)?"
+    r"(?:kannst|k\u00f6nntest|koenntest|w\u00fcrdest|wuerdest|magst)\s+du\s+(?:mir\s+)?(?:(?:mal|bitte|kurz)\s+){0,3}"
+    r"(?P<obj>.+?)\s+(?:\u00f6ffnen|oeffnen|offnen|aufmachen|starten|aufrufen)\W*$",
+    re.I,
+)
+
+
+def _open_question_app(text: str) -> str | None:
+    """'Kannst du WhatsApp oeffnen?' -> 'WhatsApp' (Frageform wird als echter Befehl behandelt)."""
+    m = _OPEN_Q.match(_voice_norm(text) + "?")
+    if not m:
+        return None
+    obj = re.sub(r"^(?:die|den|das|meine[nm]?|mein)\s+", "", m.group("obj").strip(), flags=re.I)
+    obj = re.sub(r"\s+(?:app)$", "", obj, flags=re.I).strip()
+    if not obj or len(obj.split()) > 4:
+        return None
+    return obj
+
+
+_FAKE_DONE = re.compile(
+    r"\b(?:ist|sind|wurde|wurden|habe|hab)\s+(?:\w+\s+){0,4}?(?:jetzt\s+|nun\s+|gerade\s+|schon\s+)?"
+    r"(?:ge(?:\u00f6|oe|o)ffnet|gestartet|gesendet|verschickt|abgeschickt|aufgerufen)\b",
+    re.I,
+)
 
 
 def _source_host(url: str) -> str:
@@ -428,11 +857,13 @@ def _web_answer(query: str) -> tuple[str, dict]:
     return spoken, info
 
 
-def route(text: str, from_phone: bool = True) -> tuple[str, str]:
+def route(text: str, from_phone: bool = True, phone=None) -> tuple[str, str]:
     """-> (agent, mode). mode: talk | order | action | phone | weather | pc | web."""
     t = str(text or "")
     if WORK_ORDER.search(t):
         return "NEXUS", "order"
+    if _pending_write(phone) or _phone_msg_command(t, phone):
+        return "NEXUS", "phone"  # Rueckfrage "An wen?"/"Was soll ich schreiben?" oder Schreib-Befehl
     for agent in ("NEXUS GPT", "Hermes", "Aether"):
         if _RX[agent].search(t):
             return agent, "talk"
@@ -528,9 +959,13 @@ def reply_stream(engine, agent: str, mode: str, text: str, history: list[dict], 
         yield " " + (box.get("spoken") or "Ich habe dazu gerade keine aktuellen Treffer gefunden.")
         return
     if mode == "phone":
-        cmd = _phone_command(text, from_phone=bool(meta.get("from_phone", True))) or _phone_msg_command(text) or {"intent": "unknown"}
+        link = meta.get("phone")
+        cmd = (_phone_msg_command(text, link)
+               or ({"intent": "phone_write_followup", "text": text} if _pending_write(link) else None)
+               or _phone_command(text, from_phone=bool(meta.get("from_phone", True)), link=link)
+               or {"intent": "unknown"})
         r = _run_phone(cmd, meta)
-        spoken = _spoken_result(r)
+        spoken = _spoken_result(r, full=cmd.get("intent") == "phone_read_notifications")
         meta.update(model="phone_adb", intent=cmd.get("intent"), verified=True,
                     success=r.get("success"), error=r.get("error"))
         yield spoken
@@ -610,6 +1045,10 @@ def guard_sentence(sentence: str, meta: dict) -> tuple[str, bool]:
     """Wahrheitsschutz aus dem Anruf (call.guard) je Satz; nur fuer reine Modellantworten."""
     if meta.get("verified"):
         return sentence, False
+    if _FAKE_DONE.search(sentence or ""):
+        meta["guarded"] = "unverified_action"
+        return ("Ausgefuehrt habe ich dabei nichts. Sag zum Beispiel: Oeffne WhatsApp, "
+                "oder: Schreib Anna Hallo, dann mache ich es wirklich."), True
     try:
         from nexus.voice import call
         out, why = call.guard(sentence, False)

@@ -321,3 +321,73 @@ def test_spiel_techno_is_youtube_play():
  resource-id="com.google.android.youtube:id/thumbnail" /></hierarchy>"""
     hit = find_first_youtube_video(xml)
     assert hit and hit["x"] == 540 and "Techno Mix" in hit["desc"]
+
+
+def test_read_notification_routing():
+    phrases = (
+        "lies meine Nachrichten",
+        "Lies mir meine alten Benachrichtigungen vor.",
+        "Liegt mir meine Nachrichten vor.",
+        "Liest mir meine Nachrichten vor",
+        "Lieg mir meine Nachrichten vor",
+        "Kannst du mal gucken in meinen Benachrichtigungen?",
+        "Kannst du meine WhatsApp-Nachrichten gucken?",
+        "Wie ist mit meiner Belachrichtigung vor?",
+        "Nachricht vorlesen",
+        "WhatsApp checken",
+        "zeig mir meine Nachrichten",
+    )
+    for p in phrases:
+        assert agents.route(p) == ("NEXUS", "phone"), p
+        assert agents._phone_msg_command(p)["intent"] == "phone_read_notifications", p
+    assert agents.route("Was ist in Deutschland aktuell los?") == ("NEXUS", "web")
+    assert agents._phone_msg_command("aktuelle Nachrichten") is None
+    assert agents.route("aktuelle Nachrichten")[1] != "phone"
+    assert agents.route("öffne WhatsApp") == ("NEXUS", "phone")
+    assert agents._phone_msg_command("öffne WhatsApp") is None
+
+
+def test_notification_json_string_and_group_summary():
+    from nexus.livetalk.notif_util import coerce_notification_items, is_speakable
+    from nexus.livetalk.phone_link import speak_notifications
+    raw = '[{"id":"n1","title":"Anna","text":"Bin in 10 Min da","app":"WhatsApp"}]'
+    items = coerce_notification_items(raw)
+    assert items and items[0]["title"] == "Anna"
+    wrapped = coerce_notification_items('{"notifications":' + raw + "}")
+    assert wrapped[0]["title"] == "Anna"
+    summary = {"id": "g1", "title": "WhatsApp", "text": "4 Nachrichten aus 4 Chats", "group_summary": True}
+    assert not is_speakable(summary)
+    spoken = speak_notifications([summary, items[0]])
+    assert "Anna" in spoken and "10 Min" in spoken
+    assert "4 Nachrichten" not in spoken
+
+
+def test_parse_android_notification_dump():
+    from nexus.livetalk.notif_util import parse_android_notification_dump
+    dump = """
+  NotificationRecord(0x1: pkg=com.whatsapp.w4b user=UserHandle{0} id=1 tag=null importance=4
+key=0|com.whatsapp.w4b|1|null|10367
+    Notification(channel=individual_chat_defaults flags=GROUP_SUMMARY category=msg vis=PRIVATE)
+                android.title=String (WA Business)
+                android.text=String (4 Nachrichten aus 4 Chats)
+  NotificationRecord(0x2: pkg=com.whatsapp.w4b user=UserHandle{0} id=1 tag=abc importance=4
+key=0|com.whatsapp.w4b|1|abc|10367
+    Notification(channel=individual_chat_defaults flags=0 category=msg vis=PRIVATE)
+                android.title=String (Anna)
+                android.text=String (Bin in 10 Min da)
+                android.title=String (WA Business)
+                android.text=String (1 neue Nachrichten)
+  NotificationRecord(0x3: pkg=com.android.shell user=UserHandle{0} id=2020 tag=Test importance=3
+key=0|com.android.shell|2020|Test|2000
+    Notification(channel=shell_cmd flags=0 vis=PRIVATE)
+                android.title=String (NEXUS Test)
+                android.text=String (Hallo von NEXUS)
+"""
+    items = parse_android_notification_dump(dump)
+    pkgs = [i["pkg"] for i in items]
+    titles = [i["title"] for i in items]
+    assert "com.whatsapp.w4b" in pkgs
+    assert "Anna" in titles
+    assert "WA Business" not in titles
+    assert any(i["title"] == "NEXUS Test" and "Hallo von NEXUS" in i["text"] for i in items)
+    assert all(not i.get("group_summary") for i in items)

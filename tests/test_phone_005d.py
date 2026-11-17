@@ -83,9 +83,14 @@ class Reconnect(Base):
         md = pa.parse_mdns(MDNS)
         self.assertEqual(len(md), 2)  # pairing-Dienst ignoriert
         c = pa.reconnect_candidates(md, {"serialno": "249ac5d7"})
-        self.assertEqual(c, ["192.0.2.56:38041", "192.0.2.10:38041"])
-        self.assertEqual(pa.reconnect_candidates([], {"serialno": "249ac5d7", "last_port": 38041}), ["192.0.2.10:38041"])
-        self.assertEqual(pa.reconnect_candidates(md, {}), [])  # unbekannt + mehrere -> nichts raten
+        # Tailscale :5555 zuerst, danach LAN/mDNS (38041) und derselbe Port auf der Tailscale-IP.
+        self.assertEqual(c, ["192.0.2.10:5555", "192.0.2.56:38041", "192.0.2.10:38041"])
+        self.assertEqual(
+            pa.reconnect_candidates([], {"serialno": "249ac5d7", "last_port": 38041}),
+            ["192.0.2.10:5555", "192.0.2.10:38041"],
+        )
+        # Unbekannt + mehrere mDNS: kein LAN raten, konfiguriertes :5555 bleibt.
+        self.assertEqual(pa.reconnect_candidates(md, {}), ["192.0.2.10:5555"])
 
     def _run(self, connect_out):
         calls = []
@@ -101,21 +106,39 @@ class Reconnect(Base):
         calls, run = self._run(lambda ep: f"connected to {ep}")
         with patch.object(pa, "_run", side_effect=run):
             r = pa.reconnect_once()
-        self.assertEqual(r, {"success": True, "endpoint": "192.0.2.56:38041"})
+        self.assertEqual(r, {"success": True, "endpoint": "192.0.2.10:5555"})
         for c in calls:
             self.assertIn(c[0], ("mdns", "connect"))
-        self.assertEqual(json.loads(pa.IDENTITY_PATH.read_text(encoding="utf-8"))["last_port"], 38041)
+        self.assertEqual(json.loads(pa.IDENTITY_PATH.read_text(encoding="utf-8"))["last_port"], 5555)
         self.assertIn("connected to", pa.RECONNECT_LOG.read_text(encoding="utf-8"))
 
     def test_lan_fails_tailscale_used(self):
+        # :5555 ist jetzt der erste 100.x-Kandidat und wuerde sofort greifen.
+        # Der Fall "erster Versuch tot, Fallback lebt" liegt in test_tailscale_unreachable_then_lan.
         pa.remember_identity({"serialno": "249ac5d7", "device": "sapphiren", "model": "M"}, "s1")
         calls, run = self._run(lambda ep: f"connected to {ep}" if ep.startswith("100.") else f"failed to connect to {ep}")
         with patch.object(pa, "_run", side_effect=run):
-            self.assertEqual(pa.reconnect_once()["endpoint"], "192.0.2.10:38041")
+            self.assertEqual(pa.reconnect_once()["endpoint"], "192.0.2.10:5555")
+
+    def test_tailscale_unreachable_then_lan(self):
+        pa.remember_identity({"serialno": "249ac5d7", "device": "sapphiren", "model": "M"}, "s1")
+        calls, run = self._run(
+            lambda ep: f"connected to {ep}" if ep.startswith("192.168.") else f"failed to connect to {ep}"
+        )
+        with patch.object(pa, "_run", side_effect=run):
+            r = pa.reconnect_once()
+        self.assertEqual(r, {"success": True, "endpoint": "192.0.2.56:38041"})
+        self.assertEqual(calls[0], ["mdns", "services"])
+        self.assertEqual(calls[1], ["connect", "192.0.2.10:5555"])
+        self.assertEqual(calls[2], ["connect", "192.0.2.56:38041"])
 
     def test_blocked_no_mdns(self):
+        # Ohne konfiguriertes :5555, ohne last_port und ohne mDNS bleibt NO_MDNS erhalten.
         pa.remember_identity({"serialno": "249ac5d7", "device": "sapphiren", "model": "M"}, "s1")
-        with patch.object(pa, "_run", return_value={"ok": True, "out": "List of discovered mdns services\n", "err": "", "rc": 0}):
+        cfg = dict(pa.load_config())
+        cfg["tcp_endpoint"] = ""
+        with patch.object(pa, "load_config", return_value=cfg), \
+             patch.object(pa, "_run", return_value={"ok": True, "out": "List of discovered mdns services\n", "err": "", "rc": 0}):
             r = pa.reconnect_once()
         self.assertFalse(r["success"])
         st = pa.watchdog_state()

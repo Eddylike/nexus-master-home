@@ -32,6 +32,8 @@ class PhoneLink:
         self._send_cmd = send_cmd
         self.notifications: list[dict] = []
         self.pending_reply: dict | None = None
+        self.pending_write: dict | None = None   # Rueckfrage beim Schreiben (An wen? / Was?)
+        self.last_sender: str | None = None      # letzter vorgelesener Absender ("Antworte ihr ...")
         self.last_image: dict | None = None
         self._seen_files: set[str] = set()
         self._result: dict | None = None
@@ -103,41 +105,79 @@ class PhoneLink:
             self._wait = None
 
     def notifications_live(self) -> list[dict]:
+        """Listener-Store der App + ADB-Dump zusammenfuehren (nicht nur Fallback), dann sortieren."""
+        from nexus.livetalk.notif_util import (coerce_notification_items, fetch_android_snapshot,
+                                               is_android_key, merge_notifications, notif_key,
+                                               rank_notifications)
+        store: list[dict] = []
         r = self.request("get_notifications")
-        if not r:
-            return self.fresh_notifications()
-        items = r.get("notifications") or r.get("items") or r.get("data") or r.get("result") or []
-        if isinstance(items, dict):
-            items = items.get("notifications") or items.get("items") or []
-        if not isinstance(items, list):
-            items = []
+        if r:
+            store = coerce_notification_items(
+                r.get("notifications") or r.get("items") or r.get("data") or r.get("result") or []
+            )
+        snap: dict = {"ok": False, "items": [], "active_keys": set()}
+        try:
+            snap = fetch_android_snapshot()
+        except Exception:
+            pass
+        for it in store:
+            self.remember_notification(it)
+        cached = self.fresh_notifications()
+        if snap.get("ok"):
+            act = snap.get("active_keys") or set()
+            # am Handy schon weggewischte Eintraege nicht mehr vorlesen
+            cached = [n for n in cached if not is_android_key(notif_key(n)) or notif_key(n) in act]
+        merged = merge_notifications(cached, snap.get("items") or [])
+        ranked = rank_notifications(merged)
         now = time.time()
-        out = []
-        for it in items:
-            if isinstance(it, dict):
-                it = dict(it)
-                it.setdefault("_ts", now)
-                out.append(it)
-                self.remember_notification(it)
-        return out or self.fresh_notifications()
+        for n in ranked:
+            n["_ts"] = n.get("_ts") or now
+        self.notifications = ranked
+        return list(ranked)
 
 
-def speak_notifications(items: list[dict]) -> str:
-    items = [n for n in items if isinstance(n, dict)]
+def _clean_line(s: str) -> str:
+    try:
+        from nexus.livetalk.engines import speakable
+        s = speakable(str(s or ""))
+    except Exception:
+        s = str(s or "")
+    s = re.sub(r"\s+", " ", s).strip()
+    return s.rstrip(" .")
+
+
+def _end(s: str) -> str:
+    return s if s[-1:] in ("!", "?", "\u2026") else s + "."
+
+
+def speak_notifications(items: list[dict], limit: int = 5) -> str:
+    """Messenger zuerst (neueste zuerst), Werbung/Sonstiges danach. Ohne Nummern ("1."),
+    damit die Satz-Kuerzung nichts abschneidet."""
+    from nexus.livetalk.notif_util import is_message, rank_notifications
+    items = rank_notifications(items)
     if not items:
         return "Ich habe gerade keine Nachrichten vom Handy."
     parts = []
-    for n in items[:5]:
-        who = (n.get("title") or n.get("app") or "Nachricht").strip()
-        text = (n.get("text") or "").strip()
-        if text:
-            parts.append(f"{who} schreibt: {text}")
+    for n in items[:limit]:
+        app = _clean_line(n.get("app") or "")
+        title = _clean_line(n.get("title") or "")
+        text = _clean_line(n.get("text") or "")
+        if is_message(n):
+            who = title or app or "Jemand"
+            src = f" auf {app}" if app and app.lower() not in who.lower() else ""
+            parts.append(_end(f"{who}{src} schreibt: {text}") if text else f"Nachricht von {who}{src}.")
         else:
-            parts.append(f"Nachricht von {who}.")
-    extra = f" Es liegen noch {len(items) - 5} weitere vor." if len(items) > 5 else ""
-    if len(parts) == 1:
-        return parts[0] + extra
-    return " ".join(f"{i+1}. {p}" for i, p in enumerate(parts)) + extra
+            head = app or "Benachrichtigung"
+            body = ": ".join(x for x in (title, text) if x and x.lower() != head.lower())
+            parts.append(_end(f"{head}: {body}") if body else f"{head}.")
+    n_msg = sum(1 for n in items if is_message(n))
+    intro = ""
+    if len(items) > 1:
+        intro = (f"Du hast {n_msg} Nachricht{'en' if n_msg != 1 else ''}"
+                 + (f" und {len(items) - n_msg} weitere Benachrichtigung{'en' if len(items) - n_msg != 1 else ''}"
+                    if len(items) - n_msg else "") + ". ")
+    extra = f" Es liegen noch {len(items) - limit} weitere vor." if len(items) > limit else ""
+    return intro + " ".join(parts) + extra
 
 
 def describe_image(path: str | Path | None) -> dict:

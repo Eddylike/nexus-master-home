@@ -15,12 +15,15 @@
     sel.addEventListener("change",function(){
       var v=sel.value;
       try{ window.NEXUS_PHASE2_PARTNER=v; localStorage.setItem("nexus_phase2_partner",v); }catch(e){}
-      var chip=document.getElementById("chipCrew");
-      if(chip && !chip.classList.contains("hide")){
-        fetch("/api/crew/active",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:""})}).catch(function(){});
-        chip.classList.add("hide"); chip.textContent="Crew -"; chip.style.borderColor="";
-        var inp=document.getElementById("nxInput"); if(inp) inp.placeholder="Nachricht an NEXUS\u2026";
-      }
+      /* echten Server-Zustand pruefen statt Chip (QA 17.11.) */
+      fetch("/api/crew/active",{cache:"no-store"}).then(function(r){return r.json()}).then(function(a){
+        if(!a || !a.id) return;
+        return fetch("/api/crew/active",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:""})}).then(function(){
+          var chip=document.getElementById("chipCrew");
+          if(chip){ chip.classList.add("hide"); chip.textContent="Crew -"; chip.style.borderColor=""; }
+          var inp=document.getElementById("nxInput"); if(inp){ var o=sel.options[sel.selectedIndex]; var nm=((o&&o.text)||v||"NEXUS").replace(/^[^A-Za-z0-9]+/,"").trim()||"NEXUS"; inp.placeholder="Nachricht an "+nm+"\u2026"; }
+        });
+      }).catch(function(){});
     });
   }
   function go(){ moveChips(0); hookTarget(0); }

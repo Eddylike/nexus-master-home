@@ -11,3 +11,5 @@ html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem>h4{margin:0 0 4px;font-size:
 html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem #statusChips{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;gap:3px!important;align-items:stretch!important;position:static!important;width:100%!important;max-width:100%!important}
 html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem #statusChips>*{display:block;max-width:100%!important;min-width:0!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;font-size:10px!important;padding:2px 6px!important;line-height:1.35!important;box-sizing:border-box}
 html body#nxBody#nxBody#nxBody.nx-app #nxSideSystem #statusChips>.hide{display:none!important}
+/* 3) ab 1660px lag die Kachel 'Skill- & Prompt-Bibliothek' auf dem LiveHub (unter 1660 war sie per nexus4d_mh4d.css schon aus). Bibliothek bleibt in der Sidebar. */
+html body#nxBody#nxBody#nxBody.nx-app #nxReferenceCard-library{display:none!important}

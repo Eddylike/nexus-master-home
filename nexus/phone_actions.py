@@ -72,6 +72,8 @@ PHONE_APPS: dict[str, dict[str, Any]] = {
     "rechner": {"label": "Rechner", "packages": ["com.miui.calculator", "com.google.android.calculator"],
                  "aliases": ["taschenrechner", "calculator"]},
     "nexus": {"label": "NEXUS OS", "packages": ["ai.nexus.os.mobile"], "aliases": ["nexus os", "nexus app"]},
+    "kalender": {"label": "Kalender", "packages": ["com.google.android.calendar", "com.xiaomi.calendar"],
+                 "aliases": ["calendar", "den kalender", "termine", "google kalender"]},
     "google home": {"label": "Google Home", "packages": ["com.google.android.apps.chromecast.app"],
                      "aliases": ["home"]},
 }
@@ -586,22 +588,29 @@ def reconnect_candidates(mdns: list[dict[str, Any]], known: dict[str, Any]) -> l
     if not mine and not sn:
         mine = mdns[:1] if len(mdns) == 1 else []
     eps: list[str] = []
-    # Immer zuerst der konfigurierte TCP-Endpunkt (jetzt 5555), nicht ein alter last_port (38041).
+    # Zuerst der konfigurierte TCP-Endpunkt (Tailscale ADB :5555), nicht ein alter last_port (38041).
     cfg = load_config()
     tcp = str(cfg.get("tcp_endpoint") or "").strip()
     if tcp:
         eps.append(tcp)
-    if known.get("last_endpoint") and known["last_endpoint"] not in eps:
+    if known.get("last_endpoint") and str(known["last_endpoint"]) not in eps:
         eps.append(str(known["last_endpoint"]))
-    # LAN-Fallback (Tailscale 100.x kann weg sein, das Handy bleibt im Heimnetz erreichbar)
-    lan_ep = "192.0.2.56:5555"
-    if lan_ep not in eps:
-        eps.append(lan_ep)
+    # Danach LAN/mDNS wie bisher (Host:Port aus mDNS, plus derselbe Port auf der Tailscale-IP).
     for m in mine:
-        eps.append(f'{m["host"]}:{m["port"]}')
+        ep = f'{m["host"]}:{m["port"]}'
+        if ep not in eps:
+            eps.append(ep)
         ep2 = f'{TAILSCALE_IP}:{m["port"]}'
         if ep2 not in eps:
             eps.append(ep2)
+    # Ohne mDNS: alter last_port nur als Nachzug, nie vor :5555.
+    if not mine and known.get("last_port"):
+        try:
+            ep3 = f"{TAILSCALE_IP}:{int(known['last_port'])}"
+        except (TypeError, ValueError):
+            ep3 = ""
+        if ep3 and ep3 not in eps:
+            eps.append(ep3)
     out = []
     for e in eps:
         if e not in out and _RE_SERIAL.match(e):

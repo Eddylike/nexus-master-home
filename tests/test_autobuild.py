@@ -35,7 +35,7 @@ def sandbox(monkeypatch):
 def _ab(edits, ok=True):
     return loop.Autobuild(tests_runner=lambda a, t: {"ok": ok, "summary": "x"},
                           planner=lambda i: {"mode": "patch", "result": {"edits": edits}},
-                          hermes=lambda c, t: {"ok": True, "path": "p"}, busy=lambda: None)
+                          hermes=lambda c, t: {"ok": True, "path": "p"}, busy=lambda: None, write=True, gate=lambda: {"ok": True})
 
 
 def test_apply_and_rollback(sandbox):
@@ -134,7 +134,7 @@ def test_display_unavailable_skips_autobuild_item(sandbox):
         tests_runner=lambda args, timeout: (_ for _ in ()).throw(DisplayUnavailable("headless")),
         planner=lambda item: {"mode": "patch", "result": {"edits": [{"file": rel, "find": "X = 1", "replace": "X = 2"}]}},
         hermes=lambda cycle, text: {"ok": True, "path": "p"},
-        busy=lambda: None,
+        busy=lambda: None, write=True, gate=lambda: {"ok": True},
     )
     assert build.cycle()["result"] == "SKIPPED"
 
@@ -169,7 +169,7 @@ def test_correction_round_not_counted(sandbox):
         seen.append(i.get("_korrektur"))
         return next(plans)
     ab = loop.Autobuild(tests_runner=lambda a, t: {"ok": True, "summary": "x"}, planner=planner,
-                        hermes=lambda c, t: {"ok": True, "path": "p"}, busy=lambda: None)
+                        hermes=lambda c, t: {"ok": True, "path": "p"}, busy=lambda: None, write=True, gate=lambda: {"ok": True})
     r = ab.cycle()
     assert r["result"] == "UEBERNOMMEN" and "NO_EDITS" in r["korrektur"] and target.read_text() == "X = 3\n"
     assert seen[0] is None and "NO_EDITS" in seen[1][1] and "_korrektur" not in json.loads((root / "backlog.json").read_text())[0]

@@ -1,11 +1,15 @@
 """Abnahmetests fuer NEXUS VALIDATOR v1 (validator/validator.py).
 
-5 gute Faelle muessen PASS liefern, 7 absichtlich kaputte Faelle FAIL.
+Gute Faelle muessen PASS liefern, absichtlich kaputte Faelle FAIL.
 Jeder Fall laeuft in einem frischen temporaeren Git-Repo mit Tag baseline-v0.
+20261117: Der innere pytest-Lauf des Validators ist isoliert (eigenes rootdir/basetemp/ini,
+-p no:cacheprovider), damit fremde pytest.ini/conftest.py und workspace/pytest_tmp (Temp-Race)
+ihn nicht beeinflussen. HITL-Freigaben liegen pro Test in einem eigenen Temp-Ordner.
 """
 from __future__ import annotations
 
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -88,11 +92,12 @@ class ValidatorTestBase(unittest.TestCase):
         task_path = self.base / "task.json"
         report_path = self.base / "report.json"
         task_path.write_text(json.dumps(task), encoding="utf-8")
+        env = dict(os.environ, NEXUS_VALIDATOR_HITL_DIR=str(self.base / "hitl"))
         p = subprocess.run(
             [sys.executable, str(VALIDATOR), "--task", str(task_path),
              "--repo", str(self.repo), "--report", str(report_path)],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=180,
+            timeout=180, env=env,
         )
         report = None
         if report_path.is_file():
@@ -133,6 +138,18 @@ class GoodCases(ValidatorTestBase):
         p, r = self.run_validator({"allowed_paths": ["skills/*"]})
         self.assert_pass(p, r)
         self.assertIn("skills/code_review/skill.md", r["changed_files"])
+
+    def test_good_inner_pytest_isolated(self):
+        # Regression flaky test_good_new_untracked_file: fremde Konfiguration ueber dem Repo
+        # (wie G:/meine-ki/nexus-ai/pytest.ini + conftest.py ueber workspace/pytest_tmp) darf den
+        # inneren Lauf nicht beeinflussen.
+        (self.base / "pytest.ini").write_text("[pytest]\naddopts = --nxval-unbekannte-option\n", encoding="utf-8")
+        (self.base / "conftest.py").write_text("raise RuntimeError('fremde conftest geladen')\n", encoding="utf-8")
+        self.write("skills/code_review/skill.md", "# Code Review\n")
+        p, r = self.run_validator({"allowed_paths": ["skills/*"]})
+        self.assert_pass(p, r)
+        tests_step = {s["step"]: s for s in r["steps"]}["tests"]
+        self.assertIn("1 passed", tests_step["detail"])
 
     def test_good_explicit_test_cmd(self):
         self.write("skills/notes.txt", "baseline\nmehr\n")
